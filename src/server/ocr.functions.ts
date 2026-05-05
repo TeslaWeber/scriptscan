@@ -1,0 +1,82 @@
+import { createServerFn } from "@tanstack/react-start";
+
+type OcrInput = { imageBase64: string; mimeType: string };
+
+export const extractScript = createServerFn({ method: "POST" })
+  .inputValidator((data: OcrInput) => {
+    if (!data?.imageBase64 || !data?.mimeType) throw new Error("Missing image data");
+    return data;
+  })
+  .handler(async ({ data }) => {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+
+    const systemPrompt = `You are an OCR assistant for marked university exam scripts.
+From the script image, extract:
+1. The student's MATRICULATION NUMBER (often handwritten or printed at the top, e.g. "CSC/2020/123" or "20/1234EE" or "U2019/1234567"). Normalize to uppercase, remove spaces.
+2. The lecturer's SCORE, written as "score/total" — usually circled, boxed, or highlighted in red/blue ink at the top corner. Examples: "45/60", "12/20", "78/100".
+
+If a value is unreadable or missing, return null for it. Be tolerant of handwriting, ink color, and orientation.`;
+
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "report_extraction",
+          description: "Report the extracted matric number and score.",
+          parameters: {
+            type: "object",
+            properties: {
+              matric_no: { type: ["string", "null"], description: "Matriculation number, normalized uppercase, no spaces" },
+              score: { type: ["number", "null"], description: "The numerator (awarded score)" },
+              total: { type: ["number", "null"], description: "The denominator (max score)" },
+              confidence: { type: "string", enum: ["high", "medium", "low"] },
+              notes: { type: "string" },
+            },
+            required: ["matric_no", "score", "total", "confidence"],
+            additionalProperties: false,
+          },
+        },
+      },
+    ];
+
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Extract matric number and score from this marked exam script." },
+              { type: "image_url", image_url: { url: `data:${data.mimeType};base64,${data.imageBase64}` } },
+            ],
+          },
+        ],
+        tools,
+        tool_choice: { type: "function", function: { name: "report_extraction" } },
+      }),
+    });
+
+    if (!resp.ok) {
+      if (resp.status === 429) throw new Error("Rate limit exceeded. Please wait and try again.");
+      if (resp.status === 402) throw new Error("AI credits exhausted. Add credits in Settings → Workspace → Usage.");
+      const t = await resp.text();
+      console.error("AI gateway error:", resp.status, t);
+      throw new Error("OCR service error");
+    }
+
+    const json = await resp.json();
+    const call = json?.choices?.[0]?.message?.tool_calls?.[0];
+    if (!call) throw new Error("No extraction returned");
+    const args = JSON.parse(call.function.arguments);
+    return args as {
+      matric_no: string | null;
+      score: number | null;
+      total: number | null;
+      confidence: "high" | "medium" | "low";
+      notes?: string;
+    };
+  });
