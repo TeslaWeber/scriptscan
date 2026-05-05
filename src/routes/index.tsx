@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Camera, Upload, FileSpreadsheet, Trash2, Loader2, ScanLine, AlertCircle, CheckCircle2, Pencil } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Camera, Upload, FileSpreadsheet, Trash2, Loader2, ScanLine, AlertCircle, CheckCircle2, Pencil, LogOut, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,20 +9,23 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Toaster, toast } from "sonner";
 import { extractScript } from "@/server/ocr.functions";
+import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
 
 export const Route = createFileRoute("/")({ component: Index });
 
-type Status = "queued" | "scanning" | "done" | "error";
-type Record = {
+type Status = "queued" | "scanning" | "done" | "saved" | "error";
+type Rec = {
   id: string;
+  dbId?: string;
   fileName: string;
   preview: string;
   status: Status;
   matric: string;
-  score: string; // numeric string
+  score: string;
   total: string;
-  confidence?: "high" | "medium" | "low";
+  confidence?: string;
+  notes?: string;
   error?: string;
 };
 
@@ -43,25 +46,86 @@ function fileToBase64(file: File): Promise<{ base64: string; mime: string }> {
 }
 
 function Index() {
+  const navigate = useNavigate();
+  const [authChecked, setAuthChecked] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isStaff, setIsStaff] = useState(false);
   const [course, setCourse] = useState("");
   const [pattern, setPattern] = useState(DEFAULT_PATTERN);
-  const [records, setRecords] = useState<Record[]>([]);
+  const [records, setRecords] = useState<Rec[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
+  // Auth bootstrap
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        setTimeout(() => {
+          supabase.from("user_roles").select("role").eq("user_id", session.user.id).then(({ data }) => {
+            setIsStaff((data ?? []).some((r) => r.role === "staff" || r.role === "admin"));
+          });
+        }, 0);
+      } else {
+        setIsStaff(false);
+      }
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+      setAuthChecked(true);
+      if (!data.session) navigate({ to: "/auth" });
+      else {
+        supabase.from("user_roles").select("role").eq("user_id", data.session.user.id).then(({ data: roles }) => {
+          setIsStaff((roles ?? []).some((r) => r.role === "staff" || r.role === "admin"));
+        });
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [navigate]);
+
   const matricRegex = useMemo(() => {
     try { return new RegExp(pattern); } catch { return /.*/; }
   }, [pattern]);
 
-  const updateRecord = (id: string, patch: Partial<Record>) =>
+  const updateRecord = (id: string, patch: Partial<Rec>) =>
     setRecords((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
+  // Save a fully-validated record to DB (dedupe via unique index)
+  const persistRecord = async (r: Rec) => {
+    if (!course.trim()) return { ok: false, msg: "Set a course name first" };
+    if (!user) return { ok: false, msg: "Not signed in" };
+    const score = Number(r.score);
+    if (!r.matric || !matricRegex.test(r.matric) || !Number.isFinite(score)) {
+      return { ok: false, msg: "Invalid matric or score" };
+    }
+    const { data, error } = await supabase
+      .from("scripts")
+      .upsert(
+        {
+          user_id: user.id,
+          course: course.trim(),
+          matric: r.matric.toUpperCase(),
+          score,
+          total: r.total ? Number(r.total) : null,
+          confidence: r.confidence ?? null,
+          notes: r.notes ?? null,
+          status: "done",
+        },
+        { onConflict: "course,matric", ignoreDuplicates: false }
+      )
+      .select()
+      .single();
+    if (error) return { ok: false, msg: error.message };
+    return { ok: true, dbId: data.id };
+  };
+
   const handleFiles = useCallback(async (files: FileList | null) => {
-    if (!files || !files.length) return;
+    if (!files?.length) return;
+    if (!course.trim()) { toast.error("Enter a course name first"); return; }
     const list = Array.from(files);
-    const newRecs: Record[] = list.map((f) => ({
+    const newRecs: Rec[] = list.map((f) => ({
       id: crypto.randomUUID(),
       fileName: f.name,
       preview: URL.createObjectURL(f),
@@ -82,85 +146,132 @@ function Index() {
         const { base64, mime } = await fileToBase64(file);
         const result = await extractScript({ data: { imageBase64: base64, mimeType: mime } });
         const matric = (result.matric_no ?? "").toUpperCase().replace(/\s+/g, "");
-        updateRecord(rec.id, {
+        const score = result.score != null ? String(result.score) : "";
+        const total = result.total != null ? String(result.total) : "";
+        const next: Partial<Rec> = {
           status: "done",
-          matric,
-          score: result.score != null ? String(result.score) : "",
-          total: result.total != null ? String(result.total) : "",
+          matric, score, total,
           confidence: result.confidence,
+          notes: result.notes,
           error: !matric || result.score == null ? "Review needed" : undefined,
-        });
+        };
+        updateRecord(rec.id, next);
+        // Auto-save if valid
+        const merged: Rec = { ...rec, ...next } as Rec;
+        if (merged.matric && matricRegex.test(merged.matric) && Number.isFinite(Number(merged.score))) {
+          const res = await persistRecord(merged);
+          if (res.ok) updateRecord(rec.id, { status: "saved", dbId: res.dbId });
+          else updateRecord(rec.id, { error: res.msg });
+        }
       } catch (e: any) {
         updateRecord(rec.id, { status: "error", error: e?.message ?? "OCR failed" });
         toast.error(`Failed: ${file.name}`, { description: e?.message });
       }
       setProgress(Math.round(((i + 1) / list.length) * 100));
     }
-
     setBusy(false);
-    toast.success("Scan complete", { description: `${list.length} script(s) processed.` });
-  }, []);
+    toast.success("Scan complete");
+  }, [course, user, matricRegex]);
 
-  const removeRecord = (id: string) => setRecords((rs) => rs.filter((r) => r.id !== id));
+  const saveEdited = async (r: Rec) => {
+    const res = await persistRecord(r);
+    if (res.ok) {
+      updateRecord(r.id, { status: "saved", dbId: res.dbId, error: undefined });
+      toast.success("Saved");
+    } else {
+      toast.error(res.msg);
+    }
+  };
+
+  const removeRecord = async (id: string) => {
+    const r = records.find((x) => x.id === id);
+    if (r?.dbId) await supabase.from("scripts").delete().eq("id", r.dbId);
+    setRecords((rs) => rs.filter((x) => x.id !== id));
+  };
+
   const clearAll = () => setRecords([]);
 
-  const validRecords = records.filter(
-    (r) => r.status === "done" && r.matric && r.score && matricRegex.test(r.matric),
-  );
-  // dedupe by matric
-  const exportRows = useMemo(() => {
-    const map = new Map<string, { matric: string; score: number }>();
-    for (const r of validRecords) {
-      const score = Number(r.score);
-      if (Number.isFinite(score)) map.set(r.matric, { matric: r.matric, score });
-    }
-    return Array.from(map.values()).sort((a, b) => a.matric.localeCompare(b.matric));
-  }, [validRecords]);
+  // Export READY scores from DB (full course history, deduplicated)
+  const exportScores = async () => {
+    if (!course.trim()) { toast.error("Enter course name"); return; }
+    const { data, error } = await supabase
+      .from("scripts")
+      .select("matric,score")
+      .eq("course", course.trim())
+      .not("score", "is", null)
+      .order("matric");
+    if (error) { toast.error(error.message); return; }
+    if (!data?.length) { toast.error("No saved scores for this course"); return; }
+    const rows: (string | number)[][] = [["MATRIC NO.", "SCORE"], ...data.map((r) => [r.matric, Number(r.score)])];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 22 }, { wch: 10 }];
+    for (let i = 2; i <= rows.length; i++) { const c = ws[`B${i}`]; if (c) c.t = "n"; }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Scores");
+    XLSX.writeFile(wb, `${course.replace(/\s+/g, "_")}_scores.xlsx`);
+    toast.success(`Exported ${data.length} record(s)`);
+  };
 
-  const exportXlsx = () => {
-    if (!exportRows.length) {
-      toast.error("Nothing to export", { description: "Add valid scanned records first." });
-      return;
-    }
-    const data = [
-      ["MATRIC NO.", "SCORE"],
-      ...exportRows.map((r) => [r.matric, r.score]),
+  // Export REVIEW list from current session (unsaved/needs-attention)
+  const exportReview = () => {
+    const rows = records.filter((r) => r.status !== "saved");
+    if (!rows.length) { toast.error("Nothing to review"); return; }
+    const data: (string | number)[][] = [
+      ["FILE", "MATRIC NO.", "SCORE", "TOTAL", "CONFIDENCE", "STATUS", "ERROR / NOTES"],
+      ...rows.map((r) => [
+        r.fileName,
+        r.matric || "",
+        r.score || "",
+        r.total || "",
+        r.confidence || "",
+        r.status,
+        [r.error, r.notes].filter(Boolean).join(" | "),
+      ]),
     ];
     const ws = XLSX.utils.aoa_to_sheet(data);
-    ws["!cols"] = [{ wch: 22 }, { wch: 10 }];
-    // type SCORE column as number
-    for (let i = 2; i <= data.length; i++) {
-      const cell = ws[`B${i}`];
-      if (cell) cell.t = "n";
-    }
+    ws["!cols"] = [{ wch: 28 }, { wch: 18 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
-    const sheetName = (course || "Scores").slice(0, 28).replace(/[^A-Za-z0-9 _-]/g, "");
-    XLSX.utils.book_append_sheet(wb, ws, sheetName || "Scores");
-    const fname = `${(course || "scores").replace(/\s+/g, "_")}_scores.xlsx`;
-    XLSX.writeFile(wb, fname);
-    toast.success("Exported", { description: fname });
+    XLSX.utils.book_append_sheet(wb, ws, "Review");
+    XLSX.writeFile(wb, `${(course || "scripts").replace(/\s+/g, "_")}_review.xlsx`);
+    toast.success(`Exported ${rows.length} item(s) for review`);
   };
+
+  const signOut = async () => { await supabase.auth.signOut(); navigate({ to: "/auth" }); };
+
+  if (!authChecked) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  if (!user) return null;
+  if (!isStaff) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <Card className="p-6 max-w-md text-center space-y-3">
+          <AlertTriangle className="h-10 w-10 mx-auto text-[color:var(--color-warning)]" />
+          <h2 className="font-semibold">Access pending</h2>
+          <p className="text-sm text-muted-foreground">Your account does not yet have staff access. Contact your administrator.</p>
+          <Button onClick={signOut} variant="outline">Sign out</Button>
+        </Card>
+      </div>
+    );
+  }
+
+  const reviewCount = records.filter((r) => r.status !== "saved").length;
+  const savedCount = records.filter((r) => r.status === "saved").length;
 
   return (
     <div className="min-h-screen">
       <Toaster richColors position="top-center" />
-
       <header className="border-b border-border/60 bg-card/50 backdrop-blur-md sticky top-0 z-10">
-        <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl flex items-center justify-center text-primary-foreground" style={{ background: "var(--gradient-brand)" }}>
+        <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center text-primary-foreground flex-shrink-0" style={{ background: "var(--gradient-brand)" }}>
               <ScanLine className="h-5 w-5" />
             </div>
-            <div>
-              <h1 className="text-lg font-semibold leading-tight">ScriptScan</h1>
-              <p className="text-xs text-muted-foreground">Marked scripts → Excel, in minutes</p>
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold leading-tight truncate">ScriptScan</h1>
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
           </div>
-          <Button onClick={exportXlsx} disabled={!exportRows.length} className="gap-2">
-            <FileSpreadsheet className="h-4 w-4" />
-            <span className="hidden sm:inline">Export</span>
-            <span>.xlsx</span>
-            {exportRows.length > 0 && <Badge variant="secondary" className="ml-1">{exportRows.length}</Badge>}
+          <Button onClick={signOut} variant="ghost" size="sm" className="gap-1">
+            <LogOut className="h-4 w-4" /><span className="hidden sm:inline">Sign out</span>
           </Button>
         </div>
       </header>
@@ -168,14 +279,23 @@ function Index() {
       <main className="mx-auto max-w-6xl px-4 py-6 space-y-6">
         <section className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="course">Course / Sheet name</Label>
-            <Input id="course" placeholder="e.g. CSC301 — Algorithms" value={course} onChange={(e) => setCourse(e.target.value)} />
+            <Label htmlFor="course">Course name *</Label>
+            <Input id="course" placeholder="e.g. CSC301" value={course} onChange={(e) => setCourse(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="pattern">Matric number pattern (regex)</Label>
+            <Label htmlFor="pattern">Matric pattern (regex)</Label>
             <Input id="pattern" value={pattern} onChange={(e) => setPattern(e.target.value)} className="font-mono text-xs" />
           </div>
         </section>
+
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={exportScores} disabled={!course.trim()} className="gap-2">
+            <FileSpreadsheet className="h-4 w-4" /> Export Scores .xlsx
+          </Button>
+          <Button onClick={exportReview} disabled={!reviewCount} variant="outline" className="gap-2">
+            <AlertTriangle className="h-4 w-4" /> Export Review .xlsx {reviewCount > 0 && <Badge variant="secondary">{reviewCount}</Badge>}
+          </Button>
+        </div>
 
         <Card className="p-6 border-dashed border-2 bg-card/60" style={{ boxShadow: "var(--shadow-card)" }}>
           <div className="flex flex-col items-center text-center gap-4">
@@ -184,14 +304,12 @@ function Index() {
             </div>
             <div>
               <h2 className="text-xl font-semibold">Upload marked scripts</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Use camera or pick from gallery. We detect matric number and score automatically.
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Valid scans auto-save to <strong>{course || "(set course)"}</strong>. Duplicates are merged.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <input ref={galleryRef} type="file" accept="image/*" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => handleFiles(e.target.files)} />
-              <Button onClick={() => cameraRef.current?.click()} disabled={busy} className="gap-2" size="lg">
+              <Button onClick={() => cameraRef.current?.click()} disabled={busy} size="lg" className="gap-2">
                 <Camera className="h-4 w-4" /> Take photo
               </Button>
               <Button onClick={() => galleryRef.current?.click()} disabled={busy} variant="outline" size="lg" className="gap-2">
@@ -213,18 +331,15 @@ function Index() {
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Records · {records.length} · {exportRows.length} ready
+                Session · {savedCount} saved · {reviewCount} need review
               </h3>
-              <Button variant="ghost" size="sm" onClick={clearAll} className="text-muted-foreground gap-1">
-                <Trash2 className="h-3 w-3" /> Clear
-              </Button>
+              <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1"><Trash2 className="h-3 w-3" /> Clear</Button>
             </div>
-
             <div className="grid gap-3">
               {records.map((r) => {
                 const matricValid = r.matric && matricRegex.test(r.matric);
                 const scoreValid = r.score && Number.isFinite(Number(r.score));
-                const ok = r.status === "done" && matricValid && scoreValid;
+                const ok = r.status === "saved";
                 return (
                   <Card key={r.id} className="p-3 flex gap-3 items-start" style={{ boxShadow: "var(--shadow-card)" }}>
                     <img src={r.preview} alt={r.fileName} className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-md border border-border flex-shrink-0" />
@@ -233,41 +348,35 @@ function Index() {
                         {r.status === "scanning" && <Badge variant="secondary" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" />Scanning</Badge>}
                         {r.status === "queued" && <Badge variant="outline">Queued</Badge>}
                         {r.status === "error" && <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" />Error</Badge>}
-                        {r.status === "done" && ok && <Badge className="gap-1 bg-[color:var(--color-success)] text-[color:var(--color-success-foreground)] hover:bg-[color:var(--color-success)]/90"><CheckCircle2 className="h-3 w-3" />Ready</Badge>}
-                        {r.status === "done" && !ok && <Badge className="gap-1 bg-[color:var(--color-warning)] text-[color:var(--color-warning-foreground)] hover:bg-[color:var(--color-warning)]/90"><Pencil className="h-3 w-3" />Review</Badge>}
-                        {r.confidence && <Badge variant="outline" className="text-xs">conf: {r.confidence}</Badge>}
+                        {ok && <Badge className="gap-1 bg-[color:var(--color-success)] text-[color:var(--color-success-foreground)]"><CheckCircle2 className="h-3 w-3" />Saved</Badge>}
+                        {r.status === "done" && !ok && <Badge className="gap-1 bg-[color:var(--color-warning)] text-[color:var(--color-warning-foreground)]"><Pencil className="h-3 w-3" />Review</Badge>}
+                        {r.confidence && <Badge variant="outline" className="text-xs">{r.confidence}</Badge>}
                         <span className="text-xs text-muted-foreground truncate">{r.fileName}</span>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_120px_auto] gap-2 items-end">
+                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_100px_100px_auto_auto] gap-2 items-end">
                         <div>
                           <Label className="text-xs text-muted-foreground">Matric No.</Label>
-                          <Input value={r.matric} onChange={(e) => updateRecord(r.id, { matric: e.target.value.toUpperCase() })} className={`font-mono ${r.matric && !matricValid ? "border-destructive" : ""}`} placeholder="—" />
+                          <Input value={r.matric} onChange={(e) => updateRecord(r.id, { matric: e.target.value.toUpperCase(), status: "done" })} className={`font-mono ${r.matric && !matricValid ? "border-destructive" : ""}`} placeholder="—" />
                         </div>
                         <div>
                           <Label className="text-xs text-muted-foreground">Score</Label>
-                          <Input value={r.score} onChange={(e) => updateRecord(r.id, { score: e.target.value })} type="number" placeholder="—" />
+                          <Input value={r.score} onChange={(e) => updateRecord(r.id, { score: e.target.value, status: "done" })} type="number" placeholder="—" />
                         </div>
                         <div>
                           <Label className="text-xs text-muted-foreground">Total</Label>
                           <Input value={r.total} onChange={(e) => updateRecord(r.id, { total: e.target.value })} type="number" placeholder="—" />
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)} aria-label="Remove">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Button size="sm" onClick={() => saveEdited(r)} disabled={!matricValid || !scoreValid}>Save</Button>
+                        <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                       {r.error && <p className="text-xs text-destructive">{r.error}</p>}
+                      {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
                     </div>
                   </Card>
                 );
               })}
             </div>
           </section>
-        )}
-
-        {!records.length && (
-          <p className="text-center text-sm text-muted-foreground py-8">
-            No scripts yet. Take a photo or upload to get started.
-          </p>
         )}
       </main>
     </div>
