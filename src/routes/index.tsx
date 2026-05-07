@@ -165,7 +165,8 @@ function Index() {
     setRecords((rs) => [...rs, ...newRecs]);
     setBusy(true); setProgress(0);
 
-    for (let i = 0; i < list.length; i++) {
+    let done = 0;
+    const processOne = async (i: number) => {
       const file = list[i];
       const rec = newRecs[i];
       updateRecord(rec.id, { status: "scanning" });
@@ -187,12 +188,27 @@ function Index() {
       } catch (e: any) {
         updateRecord(rec.id, { status: "error", error: e?.message ?? "OCR failed" });
         toast.error(`Failed: ${file.name}`, { description: e?.message });
+      } finally {
+        done++;
+        setProgress(Math.round((done / list.length) * 100));
       }
-      setProgress(Math.round(((i + 1) / list.length) * 100));
-    }
+    };
+
+    // Concurrency limiter
+    const indices = list.map((_, i) => i);
+    const workers = Array.from({ length: Math.min(CONCURRENCY, list.length) }, async () => {
+      while (indices.length) {
+        const i = indices.shift();
+        if (i === undefined) break;
+        await processOne(i);
+      }
+    });
+    await Promise.all(workers);
+
     setBusy(false);
     toast.success("Scan complete");
-  }, [course, user, matricRegex]);
+    refreshReviewCount();
+  }, [course, user, matricRegex, refreshReviewCount]);
 
   const saveEdited = async (r: Rec) => {
     const res = await persistRecord(r);
@@ -205,12 +221,18 @@ function Index() {
     } else {
       toast.error(res.msg ?? "Save failed");
     }
+    refreshReviewCount();
   };
 
   const removeRecord = async (id: string) => {
     const r = records.find((x) => x.id === id);
-    if (r?.dbId) await supabase.from("scripts").delete().eq("id", r.dbId);
+    if (r?.dbId) {
+      const { error } = await supabase.from("scripts").delete().eq("id", r.dbId);
+      if (error) { toast.error(`Delete failed: ${error.message}`); return; }
+      toast.success("Deleted from database");
+    }
     setRecords((rs) => rs.filter((x) => x.id !== id));
+    refreshReviewCount();
   };
 
   const clearAll = () => setRecords([]);
