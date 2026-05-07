@@ -57,8 +57,26 @@ function Index() {
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [exportingScores, setExportingScores] = useState(false);
   const [exportingReview, setExportingReview] = useState(false);
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const CONCURRENCY = 4;
+
+  const refreshReviewCount = useCallback(async (courseName?: string) => {
+    const c = (courseName ?? course).trim();
+    if (!c) { setReviewCount(null); return; }
+    const { count } = await supabase
+      .from("scripts")
+      .select("id", { count: "exact", head: true })
+      .eq("course", c)
+      .or("matric.is.null,score.is.null");
+    setReviewCount(count ?? 0);
+  }, [course]);
+
+  useEffect(() => {
+    const t = setTimeout(() => { refreshReviewCount(); }, 300);
+    return () => clearTimeout(t);
+  }, [course, refreshReviewCount]);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
