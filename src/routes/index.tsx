@@ -367,7 +367,7 @@ function Index() {
           </div>
         </section>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           <Button onClick={exportScores} disabled={!course.trim() || exportingScores} className="gap-2">
             {exportingScores ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
             Export Scores .xlsx
@@ -380,6 +380,12 @@ function Index() {
             {loadingSaved ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Load saved
           </Button>
+          {course.trim() && reviewCount !== null && (
+            <Badge variant={reviewCount > 0 ? "destructive" : "secondary"} className="gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              {reviewCount} need{reviewCount === 1 ? "s" : ""} review
+            </Badge>
+          )}
         </div>
 
         <Card className="p-6 border-dashed border-2 bg-card/60" style={{ boxShadow: "var(--shadow-card)" }}>
