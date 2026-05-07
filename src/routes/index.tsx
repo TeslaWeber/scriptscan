@@ -57,8 +57,26 @@ function Index() {
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [exportingScores, setExportingScores] = useState(false);
   const [exportingReview, setExportingReview] = useState(false);
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const CONCURRENCY = 4;
+
+  const refreshReviewCount = useCallback(async (courseName?: string) => {
+    const c = (courseName ?? course).trim();
+    if (!c) { setReviewCount(null); return; }
+    const { count } = await supabase
+      .from("scripts")
+      .select("id", { count: "exact", head: true })
+      .eq("course", c)
+      .or("matric.is.null,score.is.null");
+    setReviewCount(count ?? 0);
+  }, [course]);
+
+  useEffect(() => {
+    const t = setTimeout(() => { refreshReviewCount(); }, 300);
+    return () => clearTimeout(t);
+  }, [course, refreshReviewCount]);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
@@ -147,7 +165,8 @@ function Index() {
     setRecords((rs) => [...rs, ...newRecs]);
     setBusy(true); setProgress(0);
 
-    for (let i = 0; i < list.length; i++) {
+    let done = 0;
+    const processOne = async (i: number) => {
       const file = list[i];
       const rec = newRecs[i];
       updateRecord(rec.id, { status: "scanning" });
@@ -169,12 +188,27 @@ function Index() {
       } catch (e: any) {
         updateRecord(rec.id, { status: "error", error: e?.message ?? "OCR failed" });
         toast.error(`Failed: ${file.name}`, { description: e?.message });
+      } finally {
+        done++;
+        setProgress(Math.round((done / list.length) * 100));
       }
-      setProgress(Math.round(((i + 1) / list.length) * 100));
-    }
+    };
+
+    // Concurrency limiter
+    const indices = list.map((_, i) => i);
+    const workers = Array.from({ length: Math.min(CONCURRENCY, list.length) }, async () => {
+      while (indices.length) {
+        const i = indices.shift();
+        if (i === undefined) break;
+        await processOne(i);
+      }
+    });
+    await Promise.all(workers);
+
     setBusy(false);
     toast.success("Scan complete");
-  }, [course, user, matricRegex]);
+    refreshReviewCount();
+  }, [course, user, matricRegex, refreshReviewCount]);
 
   const saveEdited = async (r: Rec) => {
     const res = await persistRecord(r);
@@ -187,12 +221,18 @@ function Index() {
     } else {
       toast.error(res.msg ?? "Save failed");
     }
+    refreshReviewCount();
   };
 
   const removeRecord = async (id: string) => {
     const r = records.find((x) => x.id === id);
-    if (r?.dbId) await supabase.from("scripts").delete().eq("id", r.dbId);
+    if (r?.dbId) {
+      const { error } = await supabase.from("scripts").delete().eq("id", r.dbId);
+      if (error) { toast.error(`Delete failed: ${error.message}`); return; }
+      toast.success("Deleted from database");
+    }
     setRecords((rs) => rs.filter((x) => x.id !== id));
+    refreshReviewCount();
   };
 
   const clearAll = () => setRecords([]);
@@ -224,6 +264,7 @@ function Index() {
       return [...rs, ...loaded.filter((x) => !existingDbIds.has(x.dbId))];
     });
     toast.success(`Loaded ${loaded.length} saved record(s)`);
+    refreshReviewCount();
   };
 
   const exportScores = async () => {
@@ -326,7 +367,7 @@ function Index() {
           </div>
         </section>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           <Button onClick={exportScores} disabled={!course.trim() || exportingScores} className="gap-2">
             {exportingScores ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
             Export Scores .xlsx
@@ -339,6 +380,12 @@ function Index() {
             {loadingSaved ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Load saved
           </Button>
+          {course.trim() && reviewCount !== null && (
+            <Badge variant={reviewCount > 0 ? "destructive" : "secondary"} className="gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              {reviewCount} need{reviewCount === 1 ? "s" : ""} review
+            </Badge>
+          )}
         </div>
 
         <Card className="p-6 border-dashed border-2 bg-card/60" style={{ boxShadow: "var(--shadow-card)" }}>
@@ -371,69 +418,97 @@ function Index() {
           </div>
         </Card>
 
-        {records.length > 0 && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                {records.length} record(s) · {savedCount} saved
-              </h3>
-              <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1"><Trash2 className="h-3 w-3" /> Clear list</Button>
-            </div>
-            <div className="grid gap-3">
-              {records.map((r) => {
-                const matricValid = r.matric && matricRegex.test(r.matric);
-                const scoreValid = r.score !== "" && Number.isFinite(Number(r.score));
-                return (
-                  <Card key={r.id} className="p-3 flex gap-3 items-start" style={{ boxShadow: "var(--shadow-card)" }}>
-                    {r.preview ? (
-                      <a href={r.preview} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                        <img src={r.preview} alt={r.fileName} className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-md border border-border hover:opacity-80 transition" />
-                      </a>
-                    ) : (
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-md border border-border flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">Saved</div>
-                    )}
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {r.status === "scanning" && <Badge variant="secondary" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" />Scanning</Badge>}
-                        {r.status === "queued" && <Badge variant="outline">Queued</Badge>}
-                        {r.status === "error" && <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" />Error</Badge>}
-                        {r.status === "saved" && <Badge className="gap-1 bg-[color:var(--color-success)] text-[color:var(--color-success-foreground)]"><CheckCircle2 className="h-3 w-3" />Saved</Badge>}
-                        <span className="text-xs text-muted-foreground truncate">{r.fileName}</span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_auto_auto] gap-2 items-end">
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Matric No.</Label>
-                          <Input
-                            value={r.matric}
-                            onChange={(e) => updateRecord(r.id, { matric: e.target.value.toUpperCase() })}
-                            onBlur={() => saveEdited({ ...r, matric: r.matric.toUpperCase() })}
-                            className={`font-mono ${r.matric && !matricValid ? "border-destructive" : ""}`}
-                            placeholder="—"
-                          />
+        {records.length > 0 && (() => {
+          const sorted = [...records].sort((a, b) => {
+            const am = (a.matric || "~").toUpperCase();
+            const bm = (b.matric || "~").toUpperCase();
+            return am.localeCompare(bm);
+          });
+          const matricCounts = new Map<string, number>();
+          sorted.forEach((r) => {
+            const m = r.matric.toUpperCase();
+            if (m) matricCounts.set(m, (matricCounts.get(m) ?? 0) + 1);
+          });
+          return (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  {records.length} record(s) · {savedCount} saved
+                </h3>
+                <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1"><Trash2 className="h-3 w-3" /> Clear list</Button>
+              </div>
+              <div className="grid gap-3">
+                {sorted.map((r) => {
+                  const matricUpper = r.matric.toUpperCase();
+                  const matricValid = !!matricUpper && matricRegex.test(matricUpper);
+                  const scoreValid = r.score !== "" && Number.isFinite(Number(r.score));
+                  const isDup = matricUpper && (matricCounts.get(matricUpper) ?? 0) > 1;
+                  return (
+                    <Card
+                      key={r.id}
+                      className={`p-3 flex gap-3 items-start ${isDup ? "border-l-4 border-l-[color:var(--color-warning)]" : ""}`}
+                      style={{ boxShadow: "var(--shadow-card)" }}
+                    >
+                      {r.preview ? (
+                        <a href={r.preview} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                          <img src={r.preview} alt={r.fileName} className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-md border border-border hover:opacity-80 transition" />
+                        </a>
+                      ) : (
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-md border border-border flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">Saved</div>
+                      )}
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {r.status === "scanning" && <Badge variant="secondary" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" />Scanning</Badge>}
+                          {r.status === "queued" && <Badge variant="outline">Queued</Badge>}
+                          {r.status === "error" && <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" />Error</Badge>}
+                          {r.status === "saved" && <Badge className="gap-1 bg-[color:var(--color-success)] text-[color:var(--color-success-foreground)]"><CheckCircle2 className="h-3 w-3" />Saved</Badge>}
+                          {isDup && <Badge variant="outline" className="gap-1 border-[color:var(--color-warning)] text-[color:var(--color-warning)]">Merged ({matricCounts.get(matricUpper)})</Badge>}
+                          {r.confidence && <Badge variant="outline" className="text-xs">conf: {r.confidence}</Badge>}
+                          <span className="text-xs text-muted-foreground truncate">{r.fileName}</span>
                         </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Score</Label>
-                          <Input
-                            value={r.score}
-                            onChange={(e) => updateRecord(r.id, { score: e.target.value })}
-                            onBlur={() => saveEdited(r)}
-                            type="number"
-                            className={r.score && !scoreValid ? "border-destructive" : ""}
-                            placeholder="—"
-                          />
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_auto_auto] gap-2 items-end">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Matric No.</Label>
+                            <Input
+                              value={r.matric}
+                              onChange={(e) => updateRecord(r.id, { matric: e.target.value.toUpperCase() })}
+                              onBlur={() => saveEdited({ ...r, matric: r.matric.toUpperCase() })}
+                              className={`font-mono ${r.matric && !matricValid ? "border-destructive" : ""}`}
+                              placeholder="—"
+                            />
+                            {r.matric && !matricValid && (
+                              <p className="text-[11px] text-destructive mt-1">Doesn't match pattern</p>
+                            )}
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Score</Label>
+                            <Input
+                              value={r.score}
+                              onChange={(e) => updateRecord(r.id, { score: e.target.value })}
+                              onBlur={() => saveEdited(r)}
+                              type="number"
+                              className={r.score && !scoreValid ? "border-destructive" : ""}
+                              placeholder="—"
+                            />
+                            {r.score && !scoreValid && (
+                              <p className="text-[11px] text-destructive mt-1">Must be a number</p>
+                            )}
+                          </div>
+                          <Button size="sm" onClick={() => saveEdited(r)}>Save</Button>
+                          <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)} title={r.dbId ? "Delete from database" : "Remove"}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button size="sm" onClick={() => saveEdited(r)}>Save</Button>
-                        <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)}><Trash2 className="h-4 w-4" /></Button>
+                        {r.error && <p className="text-xs text-destructive">{r.error}</p>}
+                        {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
                       </div>
-                      {r.error && <p className="text-xs text-destructive">{r.error}</p>}
-                      {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          </section>
-        )}
+                    </Card>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()}
       </main>
     </div>
   );
