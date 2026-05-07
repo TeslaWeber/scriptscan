@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Upload, FileSpreadsheet, Trash2, Loader2, ScanLine, AlertCircle, CheckCircle2, Pencil, LogOut, AlertTriangle } from "lucide-react";
+import { Camera, Upload, FileSpreadsheet, Trash2, Loader2, ScanLine, AlertCircle, CheckCircle2, LogOut, AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,6 @@ type Rec = {
   status: Status;
   matric: string;
   score: string;
-  total: string;
   confidence?: string;
   notes?: string;
   error?: string;
@@ -55,10 +54,12 @@ function Index() {
   const [records, setRecords] = useState<Rec[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [exportingScores, setExportingScores] = useState(false);
+  const [exportingReview, setExportingReview] = useState(false);
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
-  // Auth bootstrap
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null);
@@ -68,9 +69,7 @@ function Index() {
             setIsStaff((data ?? []).some((r) => r.role === "staff" || r.role === "admin"));
           });
         }, 0);
-      } else {
-        setIsStaff(false);
-      }
+      } else setIsStaff(false);
     });
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
@@ -92,33 +91,49 @@ function Index() {
   const updateRecord = (id: string, patch: Partial<Rec>) =>
     setRecords((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
-  // Save a fully-validated record to DB (dedupe via unique index)
-  const persistRecord = async (r: Rec) => {
+  // Persist a record; valid → status=done(saved), invalid → status=review (still saved with error)
+  const persistRecord = async (r: Rec): Promise<{ ok: boolean; msg?: string; dbId?: string }> => {
     if (!course.trim()) return { ok: false, msg: "Set a course name first" };
     if (!user) return { ok: false, msg: "Not signed in" };
-    const score = Number(r.score);
-    if (!r.matric || !matricRegex.test(r.matric) || !Number.isFinite(score)) {
-      return { ok: false, msg: "Invalid matric or score" };
+    const matric = r.matric ? r.matric.toUpperCase().trim() : null;
+    const scoreNum = r.score !== "" && Number.isFinite(Number(r.score)) ? Number(r.score) : null;
+    const matricValid = !!matric && matricRegex.test(matric);
+    const scoreValid = scoreNum !== null;
+    const needsReview = !matricValid || !scoreValid;
+    const status = needsReview ? "review" : "done";
+
+    // Need a unique key. If no matric, can't upsert by course,matric — use update by id or insert.
+    if (r.dbId) {
+      const { data, error } = await supabase
+        .from("scripts")
+        .update({
+          matric, score: scoreNum, confidence: r.confidence ?? null,
+          notes: r.notes ?? null, status, file_name: r.fileName, error: r.error ?? null,
+        })
+        .eq("id", r.dbId).select().single();
+      if (error) return { ok: false, msg: error.message };
+      return { ok: !needsReview, msg: needsReview ? "Saved (needs review)" : undefined, dbId: data.id };
     }
-    const { data, error } = await supabase
-      .from("scripts")
-      .upsert(
-        {
-          user_id: user.id,
-          course: course.trim(),
-          matric: r.matric.toUpperCase(),
-          score,
-          total: r.total ? Number(r.total) : null,
-          confidence: r.confidence ?? null,
-          notes: r.notes ?? null,
-          status: "done",
-        },
-        { onConflict: "course,matric", ignoreDuplicates: false }
-      )
-      .select()
-      .single();
+
+    if (matric) {
+      const { data, error } = await supabase
+        .from("scripts")
+        .upsert({
+          user_id: user.id, course: course.trim(), matric, score: scoreNum,
+          confidence: r.confidence ?? null, notes: r.notes ?? null, status,
+          file_name: r.fileName, error: r.error ?? null,
+        }, { onConflict: "course,matric" }).select().single();
+      if (error) return { ok: false, msg: error.message };
+      return { ok: !needsReview, msg: needsReview ? "Saved (needs review)" : undefined, dbId: data.id };
+    }
+
+    const { data, error } = await supabase.from("scripts").insert({
+      user_id: user.id, course: course.trim(), matric: null, score: scoreNum,
+      confidence: r.confidence ?? null, notes: r.notes ?? null, status,
+      file_name: r.fileName, error: r.error ?? null,
+    }).select().single();
     if (error) return { ok: false, msg: error.message };
-    return { ok: true, dbId: data.id };
+    return { ok: false, msg: "Saved (needs review)", dbId: data.id };
   };
 
   const handleFiles = useCallback(async (files: FileList | null) => {
@@ -126,17 +141,11 @@ function Index() {
     if (!course.trim()) { toast.error("Enter a course name first"); return; }
     const list = Array.from(files);
     const newRecs: Rec[] = list.map((f) => ({
-      id: crypto.randomUUID(),
-      fileName: f.name,
-      preview: URL.createObjectURL(f),
-      status: "queued",
-      matric: "",
-      score: "",
-      total: "",
+      id: crypto.randomUUID(), fileName: f.name, preview: URL.createObjectURL(f),
+      status: "queued", matric: "", score: "",
     }));
     setRecords((rs) => [...rs, ...newRecs]);
-    setBusy(true);
-    setProgress(0);
+    setBusy(true); setProgress(0);
 
     for (let i = 0; i < list.length; i++) {
       const file = list[i];
@@ -147,22 +156,16 @@ function Index() {
         const result = await extractScript({ data: { imageBase64: base64, mimeType: mime } });
         const matric = (result.matric_no ?? "").toUpperCase().replace(/\s+/g, "");
         const score = result.score != null ? String(result.score) : "";
-        const total = result.total != null ? String(result.total) : "";
         const next: Partial<Rec> = {
-          status: "done",
-          matric, score, total,
-          confidence: result.confidence,
-          notes: result.notes,
-          error: !matric || result.score == null ? "Review needed" : undefined,
+          status: "done", matric, score,
+          confidence: result.confidence, notes: result.notes,
+          error: !matric || result.score == null ? "Missing data — please correct" : undefined,
         };
         updateRecord(rec.id, next);
-        // Auto-save if valid
         const merged: Rec = { ...rec, ...next } as Rec;
-        if (merged.matric && matricRegex.test(merged.matric) && Number.isFinite(Number(merged.score))) {
-          const res = await persistRecord(merged);
-          if (res.ok) updateRecord(rec.id, { status: "saved", dbId: res.dbId });
-          else updateRecord(rec.id, { error: res.msg });
-        }
+        const res = await persistRecord(merged);
+        if (res.ok) updateRecord(rec.id, { status: "saved", dbId: res.dbId, error: undefined });
+        else if (res.dbId) updateRecord(rec.id, { dbId: res.dbId });
       } catch (e: any) {
         updateRecord(rec.id, { status: "error", error: e?.message ?? "OCR failed" });
         toast.error(`Failed: ${file.name}`, { description: e?.message });
@@ -178,8 +181,11 @@ function Index() {
     if (res.ok) {
       updateRecord(r.id, { status: "saved", dbId: res.dbId, error: undefined });
       toast.success("Saved");
+    } else if (res.dbId) {
+      updateRecord(r.id, { dbId: res.dbId, status: "done" });
+      toast.warning(res.msg ?? "Saved (needs review)");
     } else {
-      toast.error(res.msg);
+      toast.error(res.msg ?? "Save failed");
     }
   };
 
@@ -191,49 +197,82 @@ function Index() {
 
   const clearAll = () => setRecords([]);
 
-  // Export READY scores from DB (full course history, deduplicated)
-  const exportScores = async () => {
-    if (!course.trim()) { toast.error("Enter course name"); return; }
+  const loadSaved = async () => {
+    if (!course.trim()) { toast.error("Enter a course name first"); return; }
+    setLoadingSaved(true);
     const { data, error } = await supabase
-      .from("scripts")
-      .select("matric,score")
-      .eq("course", course.trim())
-      .not("score", "is", null)
-      .order("matric");
+      .from("scripts").select("*").eq("course", course.trim())
+      .order("matric", { ascending: true });
+    setLoadingSaved(false);
     if (error) { toast.error(error.message); return; }
-    if (!data?.length) { toast.error("No saved scores for this course"); return; }
-    const rows: (string | number)[][] = [["MATRIC NO.", "SCORE"], ...data.map((r) => [r.matric, Number(r.score)])];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{ wch: 22 }, { wch: 10 }];
-    for (let i = 2; i <= rows.length; i++) { const c = ws[`B${i}`]; if (c) c.t = "n"; }
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Scores");
-    XLSX.writeFile(wb, `${course.replace(/\s+/g, "_")}_scores.xlsx`);
-    toast.success(`Exported ${data.length} record(s)`);
+    if (!data?.length) { toast.info("No saved scans for this course yet"); return; }
+    const loaded: Rec[] = data.map((d: any) => {
+      const matricValid = d.matric && matricRegex.test(d.matric);
+      const scoreValid = d.score != null;
+      const ok = matricValid && scoreValid;
+      return {
+        id: crypto.randomUUID(), dbId: d.id,
+        fileName: d.file_name || "(saved)", preview: "",
+        status: ok ? "saved" : "done",
+        matric: d.matric ?? "", score: d.score != null ? String(d.score) : "",
+        confidence: d.confidence ?? undefined, notes: d.notes ?? undefined,
+        error: d.error ?? (!ok ? "Needs review" : undefined),
+      };
+    });
+    setRecords((rs) => {
+      const existingDbIds = new Set(rs.map((x) => x.dbId).filter(Boolean));
+      return [...rs, ...loaded.filter((x) => !existingDbIds.has(x.dbId))];
+    });
+    toast.success(`Loaded ${loaded.length} saved record(s)`);
   };
 
-  // Export REVIEW list from current session (unsaved/needs-attention)
-  const exportReview = () => {
-    const rows = records.filter((r) => r.status !== "saved");
-    if (!rows.length) { toast.error("Nothing to review"); return; }
-    const data: (string | number)[][] = [
-      ["FILE", "MATRIC NO.", "SCORE", "TOTAL", "CONFIDENCE", "STATUS", "ERROR / NOTES"],
-      ...rows.map((r) => [
-        r.fileName,
-        r.matric || "",
-        r.score || "",
-        r.total || "",
-        r.confidence || "",
-        r.status,
-        [r.error, r.notes].filter(Boolean).join(" | "),
-      ]),
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws["!cols"] = [{ wch: 28 }, { wch: 18 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 40 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Review");
-    XLSX.writeFile(wb, `${(course || "scripts").replace(/\s+/g, "_")}_review.xlsx`);
-    toast.success(`Exported ${rows.length} item(s) for review`);
+  const exportScores = async () => {
+    if (!course.trim()) { toast.error("Enter course name"); return; }
+    setExportingScores(true);
+    try {
+      const { data, error } = await supabase
+        .from("scripts").select("matric,score").eq("course", course.trim())
+        .not("matric", "is", null).not("score", "is", null).order("matric");
+      if (error) { toast.error(error.message); return; }
+      if (!data?.length) { toast.error("No saved scores for this course"); return; }
+      const rows: (string | number)[][] = [["MATRIC NO.", "SCORE"], ...data.map((r) => [r.matric as string, Number(r.score)])];
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"] = [{ wch: 22 }, { wch: 10 }];
+      for (let i = 2; i <= rows.length; i++) { const c = ws[`B${i}`]; if (c) c.t = "n"; }
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Scores");
+      const filename = `${course.replace(/\s+/g, "_")}_scores.xlsx`;
+      XLSX.writeFile(wb, filename);
+      toast.success(`Exported ${data.length} record(s)`, { description: filename });
+    } finally { setExportingScores(false); }
+  };
+
+  const exportReview = async () => {
+    if (!course.trim()) { toast.error("Enter course name"); return; }
+    setExportingReview(true);
+    try {
+      const { data, error } = await supabase
+        .from("scripts").select("file_name,matric,score,confidence,notes,error,status,created_at")
+        .eq("course", course.trim())
+        .or("matric.is.null,score.is.null")
+        .order("created_at");
+      if (error) { toast.error(error.message); return; }
+      if (!data?.length) { toast.info("No items need review"); return; }
+      const rows: (string | number)[][] = [
+        ["FILE", "MATRIC NO.", "SCORE", "CONFIDENCE", "OCR ERROR / NOTES"],
+        ...data.map((r: any) => [
+          r.file_name || "", r.matric || "", r.score ?? "",
+          r.confidence || "", [r.error, r.notes].filter(Boolean).join(" | "),
+        ]),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"] = [{ wch: 28 }, { wch: 18 }, { wch: 8 }, { wch: 12 }, { wch: 40 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Review");
+      const filename = `${course.replace(/\s+/g, "_")}_review.xlsx`;
+      XLSX.writeFile(wb, filename);
+      toast.success(`Exported ${data.length} item(s) for review`, { description: filename });
+    } finally { setExportingReview(false); }
   };
 
   const signOut = async () => { await supabase.auth.signOut(); navigate({ to: "/auth" }); };
@@ -253,7 +292,6 @@ function Index() {
     );
   }
 
-  const reviewCount = records.filter((r) => r.status !== "saved").length;
   const savedCount = records.filter((r) => r.status === "saved").length;
 
   return (
@@ -289,11 +327,17 @@ function Index() {
         </section>
 
         <div className="flex flex-wrap gap-2">
-          <Button onClick={exportScores} disabled={!course.trim()} className="gap-2">
-            <FileSpreadsheet className="h-4 w-4" /> Export Scores .xlsx
+          <Button onClick={exportScores} disabled={!course.trim() || exportingScores} className="gap-2">
+            {exportingScores ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+            Export Scores .xlsx
           </Button>
-          <Button onClick={exportReview} disabled={!reviewCount} variant="outline" className="gap-2">
-            <AlertTriangle className="h-4 w-4" /> Export Review .xlsx {reviewCount > 0 && <Badge variant="secondary">{reviewCount}</Badge>}
+          <Button onClick={exportReview} disabled={!course.trim() || exportingReview} variant="outline" className="gap-2">
+            {exportingReview ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
+            Export Review .xlsx
+          </Button>
+          <Button onClick={loadSaved} disabled={!course.trim() || loadingSaved} variant="secondary" className="gap-2">
+            {loadingSaved ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Load saved
           </Button>
         </div>
 
@@ -304,11 +348,11 @@ function Index() {
             </div>
             <div>
               <h2 className="text-xl font-semibold">Upload marked scripts</h2>
-              <p className="text-sm text-muted-foreground mt-1">Valid scans auto-save to <strong>{course || "(set course)"}</strong>. Duplicates are merged.</p>
+              <p className="text-sm text-muted-foreground mt-1">Upload as many photos as you like — all save to <strong>{course || "(set course)"}</strong>. Duplicates by matric are merged.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              <input ref={galleryRef} type="file" accept="image/*" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
-              <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => handleFiles(e.target.files)} />
+              <input ref={galleryRef} type="file" accept="image/*" multiple hidden onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
               <Button onClick={() => cameraRef.current?.click()} disabled={busy} size="lg" className="gap-2">
                 <Camera className="h-4 w-4" /> Take photo
               </Button>
@@ -331,42 +375,54 @@ function Index() {
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Session · {savedCount} saved · {reviewCount} need review
+                {records.length} record(s) · {savedCount} saved
               </h3>
-              <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1"><Trash2 className="h-3 w-3" /> Clear</Button>
+              <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1"><Trash2 className="h-3 w-3" /> Clear list</Button>
             </div>
             <div className="grid gap-3">
               {records.map((r) => {
                 const matricValid = r.matric && matricRegex.test(r.matric);
-                const scoreValid = r.score && Number.isFinite(Number(r.score));
-                const ok = r.status === "saved";
+                const scoreValid = r.score !== "" && Number.isFinite(Number(r.score));
                 return (
                   <Card key={r.id} className="p-3 flex gap-3 items-start" style={{ boxShadow: "var(--shadow-card)" }}>
-                    <img src={r.preview} alt={r.fileName} className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-md border border-border flex-shrink-0" />
+                    {r.preview ? (
+                      <a href={r.preview} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                        <img src={r.preview} alt={r.fileName} className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-md border border-border hover:opacity-80 transition" />
+                      </a>
+                    ) : (
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-md border border-border flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">Saved</div>
+                    )}
                     <div className="flex-1 min-w-0 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         {r.status === "scanning" && <Badge variant="secondary" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" />Scanning</Badge>}
                         {r.status === "queued" && <Badge variant="outline">Queued</Badge>}
                         {r.status === "error" && <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" />Error</Badge>}
-                        {ok && <Badge className="gap-1 bg-[color:var(--color-success)] text-[color:var(--color-success-foreground)]"><CheckCircle2 className="h-3 w-3" />Saved</Badge>}
-                        {r.status === "done" && !ok && <Badge className="gap-1 bg-[color:var(--color-warning)] text-[color:var(--color-warning-foreground)]"><Pencil className="h-3 w-3" />Review</Badge>}
-                        {r.confidence && <Badge variant="outline" className="text-xs">{r.confidence}</Badge>}
+                        {r.status === "saved" && <Badge className="gap-1 bg-[color:var(--color-success)] text-[color:var(--color-success-foreground)]"><CheckCircle2 className="h-3 w-3" />Saved</Badge>}
                         <span className="text-xs text-muted-foreground truncate">{r.fileName}</span>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_100px_100px_auto_auto] gap-2 items-end">
+                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_auto_auto] gap-2 items-end">
                         <div>
                           <Label className="text-xs text-muted-foreground">Matric No.</Label>
-                          <Input value={r.matric} onChange={(e) => updateRecord(r.id, { matric: e.target.value.toUpperCase(), status: "done" })} className={`font-mono ${r.matric && !matricValid ? "border-destructive" : ""}`} placeholder="—" />
+                          <Input
+                            value={r.matric}
+                            onChange={(e) => updateRecord(r.id, { matric: e.target.value.toUpperCase() })}
+                            onBlur={() => saveEdited({ ...r, matric: r.matric.toUpperCase() })}
+                            className={`font-mono ${r.matric && !matricValid ? "border-destructive" : ""}`}
+                            placeholder="—"
+                          />
                         </div>
                         <div>
                           <Label className="text-xs text-muted-foreground">Score</Label>
-                          <Input value={r.score} onChange={(e) => updateRecord(r.id, { score: e.target.value, status: "done" })} type="number" placeholder="—" />
+                          <Input
+                            value={r.score}
+                            onChange={(e) => updateRecord(r.id, { score: e.target.value })}
+                            onBlur={() => saveEdited(r)}
+                            type="number"
+                            className={r.score && !scoreValid ? "border-destructive" : ""}
+                            placeholder="—"
+                          />
                         </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Total</Label>
-                          <Input value={r.total} onChange={(e) => updateRecord(r.id, { total: e.target.value })} type="number" placeholder="—" />
-                        </div>
-                        <Button size="sm" onClick={() => saveEdited(r)} disabled={!matricValid || !scoreValid}>Save</Button>
+                        <Button size="sm" onClick={() => saveEdited(r)}>Save</Button>
                         <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                       {r.error && <p className="text-xs text-destructive">{r.error}</p>}

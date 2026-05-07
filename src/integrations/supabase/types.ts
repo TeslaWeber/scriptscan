@@ -43,8 +43,10 @@ export type Database = {
           confidence: string | null
           course: string
           created_at: string
+          error: string | null
+          file_name: string | null
           id: string
-          matric: string
+          matric: string | null
           notes: string | null
           score: number | null
           status: string
@@ -56,8 +58,10 @@ export type Database = {
           confidence?: string | null
           course: string
           created_at?: string
+          error?: string | null
+          file_name?: string | null
           id?: string
-          matric: string
+          matric?: string | null
           notes?: string | null
           score?: number | null
           status?: string
@@ -69,8 +73,10 @@ export type Database = {
           confidence?: string | null
           course?: string
           created_at?: string
+          error?: string | null
+          file_name?: string | null
           id?: string
-          matric?: string
+          matric?: string | null
           notes?: string | null
           score?: number | null
           status?: string
