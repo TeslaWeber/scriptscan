@@ -264,6 +264,7 @@ function Index() {
       return [...rs, ...loaded.filter((x) => !existingDbIds.has(x.dbId))];
     });
     toast.success(`Loaded ${loaded.length} saved record(s)`);
+    refreshReviewCount();
   };
 
   const exportScores = async () => {
