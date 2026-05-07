@@ -418,69 +418,97 @@ function Index() {
           </div>
         </Card>
 
-        {records.length > 0 && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                {records.length} record(s) · {savedCount} saved
-              </h3>
-              <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1"><Trash2 className="h-3 w-3" /> Clear list</Button>
-            </div>
-            <div className="grid gap-3">
-              {records.map((r) => {
-                const matricValid = r.matric && matricRegex.test(r.matric);
-                const scoreValid = r.score !== "" && Number.isFinite(Number(r.score));
-                return (
-                  <Card key={r.id} className="p-3 flex gap-3 items-start" style={{ boxShadow: "var(--shadow-card)" }}>
-                    {r.preview ? (
-                      <a href={r.preview} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                        <img src={r.preview} alt={r.fileName} className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-md border border-border hover:opacity-80 transition" />
-                      </a>
-                    ) : (
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-md border border-border flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">Saved</div>
-                    )}
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {r.status === "scanning" && <Badge variant="secondary" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" />Scanning</Badge>}
-                        {r.status === "queued" && <Badge variant="outline">Queued</Badge>}
-                        {r.status === "error" && <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" />Error</Badge>}
-                        {r.status === "saved" && <Badge className="gap-1 bg-[color:var(--color-success)] text-[color:var(--color-success-foreground)]"><CheckCircle2 className="h-3 w-3" />Saved</Badge>}
-                        <span className="text-xs text-muted-foreground truncate">{r.fileName}</span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_auto_auto] gap-2 items-end">
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Matric No.</Label>
-                          <Input
-                            value={r.matric}
-                            onChange={(e) => updateRecord(r.id, { matric: e.target.value.toUpperCase() })}
-                            onBlur={() => saveEdited({ ...r, matric: r.matric.toUpperCase() })}
-                            className={`font-mono ${r.matric && !matricValid ? "border-destructive" : ""}`}
-                            placeholder="—"
-                          />
+        {records.length > 0 && (() => {
+          const sorted = [...records].sort((a, b) => {
+            const am = (a.matric || "~").toUpperCase();
+            const bm = (b.matric || "~").toUpperCase();
+            return am.localeCompare(bm);
+          });
+          const matricCounts = new Map<string, number>();
+          sorted.forEach((r) => {
+            const m = r.matric.toUpperCase();
+            if (m) matricCounts.set(m, (matricCounts.get(m) ?? 0) + 1);
+          });
+          return (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  {records.length} record(s) · {savedCount} saved
+                </h3>
+                <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1"><Trash2 className="h-3 w-3" /> Clear list</Button>
+              </div>
+              <div className="grid gap-3">
+                {sorted.map((r) => {
+                  const matricUpper = r.matric.toUpperCase();
+                  const matricValid = !!matricUpper && matricRegex.test(matricUpper);
+                  const scoreValid = r.score !== "" && Number.isFinite(Number(r.score));
+                  const isDup = matricUpper && (matricCounts.get(matricUpper) ?? 0) > 1;
+                  return (
+                    <Card
+                      key={r.id}
+                      className={`p-3 flex gap-3 items-start ${isDup ? "border-l-4 border-l-[color:var(--color-warning)]" : ""}`}
+                      style={{ boxShadow: "var(--shadow-card)" }}
+                    >
+                      {r.preview ? (
+                        <a href={r.preview} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                          <img src={r.preview} alt={r.fileName} className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-md border border-border hover:opacity-80 transition" />
+                        </a>
+                      ) : (
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-md border border-border flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">Saved</div>
+                      )}
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {r.status === "scanning" && <Badge variant="secondary" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" />Scanning</Badge>}
+                          {r.status === "queued" && <Badge variant="outline">Queued</Badge>}
+                          {r.status === "error" && <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" />Error</Badge>}
+                          {r.status === "saved" && <Badge className="gap-1 bg-[color:var(--color-success)] text-[color:var(--color-success-foreground)]"><CheckCircle2 className="h-3 w-3" />Saved</Badge>}
+                          {isDup && <Badge variant="outline" className="gap-1 border-[color:var(--color-warning)] text-[color:var(--color-warning)]">Merged ({matricCounts.get(matricUpper)})</Badge>}
+                          {r.confidence && <Badge variant="outline" className="text-xs">conf: {r.confidence}</Badge>}
+                          <span className="text-xs text-muted-foreground truncate">{r.fileName}</span>
                         </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Score</Label>
-                          <Input
-                            value={r.score}
-                            onChange={(e) => updateRecord(r.id, { score: e.target.value })}
-                            onBlur={() => saveEdited(r)}
-                            type="number"
-                            className={r.score && !scoreValid ? "border-destructive" : ""}
-                            placeholder="—"
-                          />
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_auto_auto] gap-2 items-end">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Matric No.</Label>
+                            <Input
+                              value={r.matric}
+                              onChange={(e) => updateRecord(r.id, { matric: e.target.value.toUpperCase() })}
+                              onBlur={() => saveEdited({ ...r, matric: r.matric.toUpperCase() })}
+                              className={`font-mono ${r.matric && !matricValid ? "border-destructive" : ""}`}
+                              placeholder="—"
+                            />
+                            {r.matric && !matricValid && (
+                              <p className="text-[11px] text-destructive mt-1">Doesn't match pattern</p>
+                            )}
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Score</Label>
+                            <Input
+                              value={r.score}
+                              onChange={(e) => updateRecord(r.id, { score: e.target.value })}
+                              onBlur={() => saveEdited(r)}
+                              type="number"
+                              className={r.score && !scoreValid ? "border-destructive" : ""}
+                              placeholder="—"
+                            />
+                            {r.score && !scoreValid && (
+                              <p className="text-[11px] text-destructive mt-1">Must be a number</p>
+                            )}
+                          </div>
+                          <Button size="sm" onClick={() => saveEdited(r)}>Save</Button>
+                          <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)} title={r.dbId ? "Delete from database" : "Remove"}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button size="sm" onClick={() => saveEdited(r)}>Save</Button>
-                        <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)}><Trash2 className="h-4 w-4" /></Button>
+                        {r.error && <p className="text-xs text-destructive">{r.error}</p>}
+                        {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
                       </div>
-                      {r.error && <p className="text-xs text-destructive">{r.error}</p>}
-                      {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          </section>
-        )}
+                    </Card>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()}
       </main>
     </div>
   );
