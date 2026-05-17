@@ -37,6 +37,10 @@ export const Route = createRootRoute({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "ScriptScan — Digitize Marked Exam Scripts to Excel" },
+      { name: "twitter:description", content: "Scan marked exam scripts, auto-extract matric numbers and scores, and export a clean .xlsx file." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/bc7f6fd6-e1ee-4f3d-a211-159f8d507db1" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/bc7f6fd6-e1ee-4f3d-a211-159f8d507db1" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
