@@ -19,9 +19,8 @@ import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
 
 export const Route = createFileRoute("/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    course: typeof search.course === "string" ? search.course : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { course?: string } =>
+    typeof search.course === "string" && search.course ? { course: search.course } : {},
   head: () => ({
     meta: [
       { title: "Examination Console — ScriptScan" },
