@@ -831,7 +831,7 @@ function Index() {
                           </div>
                         )}
 
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px_auto_auto_auto] gap-2 items-end">
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px_auto_auto] gap-2 items-end">
                           <div>
                             <Label className="text-xs text-muted-foreground">Matric No.</Label>
                             <Input
