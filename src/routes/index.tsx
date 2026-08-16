@@ -787,7 +787,6 @@ function Index() {
                   const parsed = parseScore(r.score);
                   const scoreValid = parsed.ok;
                   const isDup = matricUpper && (matricCounts.get(matricUpper) ?? 0) > 1;
-                  const hasFile = fileMap.current.has(r.id);
                   return (
                     <Card
                       key={r.id}
