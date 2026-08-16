@@ -688,6 +688,54 @@ function Index() {
     <div className="min-h-screen">
       <Toaster richColors position="top-center" />
 
+      {liveOn && (
+        <div className="fixed inset-0 z-50 bg-black">
+          <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />
+
+          {/* guide frame */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+            <div className="w-full max-w-xl aspect-[4/3] rounded-sm border-2 border-[color:var(--color-brass)]/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+          </div>
+
+          <div className="absolute top-0 inset-x-0 flex items-center justify-between gap-2 p-4 text-white">
+            <div className="min-w-0">
+              <p className="font-display text-lg leading-tight">{course}</p>
+              <p className="text-xs opacity-80 truncate">{liveHint || "Searching for a script…"}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="rounded-sm">{liveCaptured} captured</Badge>
+              <Button size="icon" variant="ghost" onClick={stopLive} className="text-white hover:bg-white/15" title="Close">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="absolute bottom-0 inset-x-0 p-5 pb-8 flex items-center justify-center gap-4">
+            {torchSupported && (
+              <Button size="icon" variant="ghost" onClick={toggleTorch} className="h-12 w-12 rounded-full text-white hover:bg-white/15" title="Flashlight">
+                {torchOn ? <Zap className="h-6 w-6 text-[color:var(--color-brass)]" /> : <ZapOff className="h-6 w-6" />}
+              </Button>
+            )}
+            <Button
+              onClick={grabFrame}
+              className="h-16 w-16 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 p-0"
+              title="Capture now"
+            >
+              <Camera className="h-6 w-6 text-white" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setAutoCapture((a) => !a)}
+              className="h-12 w-12 rounded-full text-white hover:bg-white/15"
+              title={autoCapture ? "Pause auto-detect" : "Resume auto-detect"}
+            >
+              {autoCapture ? <Square className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <header className="border-b-2 border-primary/80 bg-primary text-primary-foreground">
         <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
