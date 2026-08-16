@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera, Upload, FileSpreadsheet, Trash2, Loader2, AlertCircle, CheckCircle2, LogOut,
-  AlertTriangle, RefreshCw, GitMerge, Mic, Square, Video, Archive, GraduationCap, Play,
+  AlertTriangle, GitMerge, Mic, Square, Video, Archive, GraduationCap, Play, Zap, ZapOff, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -111,6 +111,9 @@ function Index() {
   const [liveOn, setLiveOn] = useState(false);
   const [autoCapture, setAutoCapture] = useState(true);
   const [liveCaptured, setLiveCaptured] = useState(0);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [liveHint, setLiveHint] = useState("");
   const liveBusy = useRef(false);
   const seenMatrics = useRef<Set<string>>(new Set());
 
@@ -322,6 +325,8 @@ function Index() {
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setLiveOn(false);
+    setTorchOn(false);
+    setTorchSupported(false);
   }, []);
 
   useEffect(() => () => { streamRef.current?.getTracks().forEach((t) => t.stop()); }, []);
@@ -334,8 +339,12 @@ function Index() {
         audio: false,
       });
       streamRef.current = stream;
+      const track = stream.getVideoTracks()[0];
+      const caps: any = track?.getCapabilities?.() ?? {};
+      setTorchSupported(!!caps.torch);
       setLiveOn(true);
       setLiveCaptured(0);
+      setLiveHint("Searching for a script…");
       seenMatrics.current = new Set();
       requestAnimationFrame(() => {
         if (videoRef.current) {
@@ -348,49 +357,122 @@ function Index() {
     }
   };
 
-  const grabFrame = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video || video.videoWidth === 0 || liveBusy.current) return;
-    liveBusy.current = true;
+  const toggleTorch = async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torchOn;
     try {
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d")?.drawImage(video, 0, 0);
-      const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.9));
-      if (!blob) return;
-      const preview = canvas.toDataURL("image/jpeg", 0.6);
+      await track.applyConstraints({ advanced: [{ torch: next }] } as any);
+      setTorchOn(next);
+    } catch {
+      toast.error("Flashlight not available on this device");
+    }
+  };
+
+  /** Snapshot the current video frame as a JPEG blob + small preview. */
+  const snapshot = (): { blob: Promise<Blob | null>; preview: string } | null => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    return {
+      blob: new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.85)),
+      preview: canvas.toDataURL("image/jpeg", 0.5),
+    };
+  };
+
+  const fileLiveCapture = useCallback(
+    async (blob: Blob, preview: string, ocr: { matric: string; score: string; total: string; confidence?: string; notes?: string }) => {
       const recId = crypto.randomUUID();
       const rec: Rec = {
-        id: recId, fileName: `live-${new Date().toISOString().slice(11, 19)}.jpg`,
-        preview, status: "scanning", matric: "", score: "", total: "",
+        id: recId,
+        fileName: `live-${new Date().toISOString().slice(11, 19)}.jpg`,
+        preview,
+        status: "done",
+        matric: ocr.matric,
+        score: ocr.score,
+        total: ocr.total,
+        confidence: ocr.confidence,
+        notes: ocr.notes,
       };
       fileMap.current.set(recId, new File([blob], rec.fileName, { type: "image/jpeg" }));
       setRecords((rs) => [...rs, rec]);
-      const next = await runOcr(recId, blob);
-      const matric = (next.matric ?? "").toUpperCase();
-      if (matric && seenMatrics.current.has(matric)) {
-        // same script still in frame — discard the duplicate capture silently
-        setRecords((rs) => rs.filter((x) => x.id !== recId));
-        fileMap.current.delete(recId);
-        return;
-      }
-      if (matric) seenMatrics.current.add(matric);
-      applyPersistResult(recId, await persistRecord({ ...rec, ...next } as Rec));
+      applyPersistResult(recId, await persistRecord(rec));
       setLiveCaptured((n) => n + 1);
       refreshReviewCount();
+    },
+    [course, user, matricRegex, refreshReviewCount],
+  );
+
+  /** Continuous read: only files a capture when a valid matric AND a score are visible. */
+  const scanTick = useCallback(async () => {
+    if (liveBusy.current) return;
+    const shot = snapshot();
+    if (!shot) return;
+    liveBusy.current = true;
+    try {
+      const blob = await shot.blob;
+      if (!blob) return;
+      const { base64, mime } = await fileToBase64(blob);
+      const result = await extractScript({ data: { imageBase64: base64, mimeType: mime } });
+      const matric = (result.matric_no ?? "").toUpperCase().replace(/\s+/g, "");
+      const valid = !!matric && matricRegex.test(matric);
+      const hasScore = result.score != null;
+      if (!valid || !hasScore) {
+        setLiveHint(!valid ? "No matching matric number in view…" : "Matric found — waiting for a score…");
+        return;
+      }
+      if (seenMatrics.current.has(matric)) { setLiveHint(`${matric} already captured — next script`); return; }
+      seenMatrics.current.add(matric);
+      setLiveHint(`Captured ${matric} · ${result.score}`);
+      await fileLiveCapture(blob, shot.preview, {
+        matric,
+        score: String(result.score),
+        total: result.total != null ? String(result.total) : "",
+        confidence: result.confidence,
+        notes: result.notes,
+      });
     } catch {
       /* keep the live loop alive on a failed frame */
     } finally {
       liveBusy.current = false;
     }
-  }, [course, user, matricRegex, runOcr, refreshReviewCount]);
+  }, [matricRegex, fileLiveCapture]);
+
+  /** Manual shutter — files whatever is read, valid or not. */
+  const grabFrame = useCallback(async () => {
+    if (liveBusy.current) return;
+    const shot = snapshot();
+    if (!shot) return;
+    liveBusy.current = true;
+    try {
+      const blob = await shot.blob;
+      if (!blob) return;
+      const { base64, mime } = await fileToBase64(blob);
+      const result = await extractScript({ data: { imageBase64: base64, mimeType: mime } });
+      const matric = (result.matric_no ?? "").toUpperCase().replace(/\s+/g, "");
+      if (matric) seenMatrics.current.add(matric);
+      await fileLiveCapture(blob, shot.preview, {
+        matric,
+        score: result.score != null ? String(result.score) : "",
+        total: result.total != null ? String(result.total) : "",
+        confidence: result.confidence,
+        notes: result.notes,
+      });
+    } catch (e: any) {
+      toast.error("Capture failed", { description: e?.message });
+    } finally {
+      liveBusy.current = false;
+    }
+  }, [fileLiveCapture]);
 
   useEffect(() => {
     if (!liveOn || !autoCapture) return;
-    const id = setInterval(() => { grabFrame(); }, 4000);
+    const id = setInterval(() => { scanTick(); }, 900);
     return () => clearInterval(id);
-  }, [liveOn, autoCapture, grabFrame]);
+  }, [liveOn, autoCapture, scanTick]);
 
   // ================= VOICE CAPTURE =================
   const startRecording = async () => {
@@ -492,20 +574,6 @@ function Index() {
     toast.info("Kept existing saved row");
   };
 
-  const rescan = async (r: Rec) => {
-    const file = fileMap.current.get(r.id);
-    if (!file) { toast.error("Original image unavailable for this record"); return; }
-    try {
-      const next = await runOcr(r.id, file);
-      const res = await persistRecord({ ...r, ...next } as Rec);
-      applyPersistResult(r.id, res);
-      if (res.ok) toast.success("Re-scanned & saved");
-      else if (res.dbId) toast.warning(res.msg ?? "Re-scanned (needs review)");
-    } catch (e: any) {
-      toast.error("Re-scan failed", { description: e?.message });
-    }
-    refreshReviewCount();
-  };
 
   const removeRecord = async (id: string) => {
     const r = records.find((x) => x.id === id);
@@ -556,24 +624,44 @@ function Index() {
     loadSaved(search.course);
   }, [user, isStaff, search.course, loadSaved]);
 
+  /**
+   * Exports EXACTLY the entries currently on this page — nothing else from the
+   * archive — then wipes the console so the next batch starts from scratch.
+   */
   const exportScores = async () => {
     if (!course.trim()) { toast.error("Enter course code"); return; }
     setExportingScores(true);
     try {
-      const { data, error } = await supabase
-        .from("scripts").select("matric,score").eq("course", course.trim())
-        .not("matric", "is", null).not("score", "is", null).order("matric");
-      if (error) { toast.error(error.message); return; }
-      if (!data?.length) { toast.error("No saved scores for this course"); return; }
-      const rows: (string | number)[][] = [["MATRIC NO.", "SCORE"], ...data.map((r) => [r.matric as string, Number(r.score)])];
+      const byMatric = new Map<string, number>();
+      for (const r of records) {
+        const m = r.matric.toUpperCase().trim();
+        const parsed = parseScore(r.score);
+        if (!m || !matricRegex.test(m) || parsed.score == null || !parsed.ok) continue;
+        byMatric.set(m, parsed.score); // last edit for a matric wins — no duplicates
+      }
+      const entries = [...byMatric.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      if (!entries.length) { toast.error("Nothing complete to export on this page"); return; }
+
+      const rows: (string | number)[][] = [["MATRIC NO.", "SCORE"], ...entries.map(([m, s]) => [m, s])];
       const ws = XLSX.utils.aoa_to_sheet(rows);
       ws["!cols"] = [{ wch: 22 }, { wch: 10 }];
+      ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: 1 } });
       for (let i = 2; i <= rows.length; i++) { const c = ws[`B${i}`]; if (c) c.t = "n"; }
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Scores");
       const filename = `${course.replace(/\s+/g, "_")}_scores.xlsx`;
       XLSX.writeFile(wb, filename);
-      toast.success(`Exported ${data.length} record(s)`, { description: filename });
+      toast.success(`Exported ${entries.length} record(s)`, { description: filename });
+
+      // Fresh slate — this batch is closed.
+      setRecords([]);
+      fileMap.current.clear();
+      seenMatrics.current = new Set();
+      setTranscript("");
+      setProgress(0);
+      setCourse("");
+      setReviewCount(null);
+      openedRef.current = true;
     } finally { setExportingScores(false); }
   };
 
@@ -599,6 +687,54 @@ function Index() {
   return (
     <div className="min-h-screen">
       <Toaster richColors position="top-center" />
+
+      {liveOn && (
+        <div className="fixed inset-0 z-50 bg-black">
+          <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />
+
+          {/* guide frame */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+            <div className="w-full max-w-xl aspect-[4/3] rounded-sm border-2 border-[color:var(--color-brass)]/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+          </div>
+
+          <div className="absolute top-0 inset-x-0 flex items-center justify-between gap-2 p-4 text-white">
+            <div className="min-w-0">
+              <p className="font-display text-lg leading-tight">{course}</p>
+              <p className="text-xs opacity-80 truncate">{liveHint || "Searching for a script…"}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="rounded-sm">{liveCaptured} captured</Badge>
+              <Button size="icon" variant="ghost" onClick={stopLive} className="text-white hover:bg-white/15" title="Close">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="absolute bottom-0 inset-x-0 p-5 pb-8 flex items-center justify-center gap-4">
+            {torchSupported && (
+              <Button size="icon" variant="ghost" onClick={toggleTorch} className="h-12 w-12 rounded-full text-white hover:bg-white/15" title="Flashlight">
+                {torchOn ? <Zap className="h-6 w-6 text-[color:var(--color-brass)]" /> : <ZapOff className="h-6 w-6" />}
+              </Button>
+            )}
+            <Button
+              onClick={grabFrame}
+              className="h-16 w-16 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 p-0"
+              title="Capture now"
+            >
+              <Camera className="h-6 w-6 text-white" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setAutoCapture((a) => !a)}
+              className="h-12 w-12 rounded-full text-white hover:bg-white/15"
+              title={autoCapture ? "Pause auto-detect" : "Resume auto-detect"}
+            >
+              {autoCapture ? <Square className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <header className="border-b-2 border-primary/80 bg-primary text-primary-foreground">
         <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between gap-3">
@@ -699,33 +835,13 @@ function Index() {
             <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
               <div className="text-center space-y-1">
                 <h2 className="font-display text-2xl">Live camera sweep</h2>
-                <p className="text-sm text-muted-foreground">
-                  Hold each script in front of the camera. A frame is read automatically every few seconds and duplicate matric numbers are ignored.
+                <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+                  Opens a full-screen camera. Frames are read continuously and a capture is only filed when a matric number
+                  matching <span className="font-mono">{pattern}</span> is detected together with a score.
                 </p>
               </div>
-
-              <div className="relative mx-auto w-full max-w-2xl aspect-video overflow-hidden rounded-sm border border-border bg-secondary">
-                <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
-                {!liveOn && (
-                  <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                    Camera off
-                  </div>
-                )}
-              </div>
-
               <div className="flex flex-wrap justify-center gap-2">
-                {!liveOn ? (
-                  <Button onClick={startLive} className="gap-2"><Play className="h-4 w-4" /> Start live scan</Button>
-                ) : (
-                  <>
-                    <Button onClick={grabFrame} variant="secondary" className="gap-2"><Camera className="h-4 w-4" /> Capture now</Button>
-                    <Button onClick={() => setAutoCapture((a) => !a)} variant="outline" className="gap-2">
-                      {autoCapture ? "Pause auto-capture" : "Resume auto-capture"}
-                    </Button>
-                    <Button onClick={stopLive} variant="destructive" className="gap-2"><Square className="h-4 w-4" /> Stop</Button>
-                  </>
-                )}
-                {liveOn && <Badge variant="secondary" className="rounded-sm">{liveCaptured} captured</Badge>}
+                <Button onClick={startLive} size="lg" className="gap-2"><Play className="h-4 w-4" /> Start live scan</Button>
               </div>
             </Card>
           </TabsContent>
@@ -787,7 +903,6 @@ function Index() {
                   const parsed = parseScore(r.score);
                   const scoreValid = parsed.ok;
                   const isDup = matricUpper && (matricCounts.get(matricUpper) ?? 0) > 1;
-                  const hasFile = fileMap.current.has(r.id);
                   return (
                     <Card
                       key={r.id}
@@ -832,7 +947,7 @@ function Index() {
                           </div>
                         )}
 
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px_auto_auto_auto] gap-2 items-end">
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px_auto_auto] gap-2 items-end">
                           <div>
                             <Label className="text-xs text-muted-foreground">Matric No.</Label>
                             <Input
@@ -856,26 +971,11 @@ function Index() {
                               className={`font-mono ${r.score && !scoreValid ? "border-destructive" : ""}`}
                               placeholder="e.g. 45 or 45/60"
                             />
-                            {r.score && parsed.ok && (
-                              <p className="text-[11px] text-muted-foreground mt-1">
-                                Score: <strong>{parsed.score}</strong>{parsed.total != null ? <> · out of <strong>{parsed.total}</strong></> : null}
-                              </p>
-                            )}
                             {r.score && !parsed.ok && (
                               <p className="text-[11px] text-destructive mt-1">Invalid: {parsed.reason}</p>
                             )}
                           </div>
                           <Button size="sm" onClick={() => saveEdited(r)}>Save</Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => rescan(r)}
-                            disabled={!hasFile || r.status === "scanning"}
-                            title={hasFile ? "Re-read the original image" : "Original image not in this session"}
-                            className="gap-1"
-                          >
-                            <RefreshCw className={`h-3 w-3 ${r.status === "scanning" ? "animate-spin" : ""}`} /> Re-scan
-                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)} title={r.dbId ? "Delete permanently" : "Remove"}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
