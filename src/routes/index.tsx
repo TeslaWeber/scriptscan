@@ -574,20 +574,6 @@ function Index() {
     toast.info("Kept existing saved row");
   };
 
-  const rescan = async (r: Rec) => {
-    const file = fileMap.current.get(r.id);
-    if (!file) { toast.error("Original image unavailable for this record"); return; }
-    try {
-      const next = await runOcr(r.id, file);
-      const res = await persistRecord({ ...r, ...next } as Rec);
-      applyPersistResult(r.id, res);
-      if (res.ok) toast.success("Re-scanned & saved");
-      else if (res.dbId) toast.warning(res.msg ?? "Re-scanned (needs review)");
-    } catch (e: any) {
-      toast.error("Re-scan failed", { description: e?.message });
-    }
-    refreshReviewCount();
-  };
 
   const removeRecord = async (id: string) => {
     const r = records.find((x) => x.id === id);
