@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera, Upload, FileSpreadsheet, Trash2, Loader2, AlertCircle, CheckCircle2, LogOut,
-  AlertTriangle, RefreshCw, GitMerge, Mic, Square, Video, Archive, GraduationCap, Play,
+  AlertTriangle, GitMerge, Mic, Square, Video, Archive, GraduationCap, Play, Zap, ZapOff, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
