@@ -699,33 +699,13 @@ function Index() {
             <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
               <div className="text-center space-y-1">
                 <h2 className="font-display text-2xl">Live camera sweep</h2>
-                <p className="text-sm text-muted-foreground">
-                  Hold each script in front of the camera. A frame is read automatically every few seconds and duplicate matric numbers are ignored.
+                <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+                  Opens a full-screen camera. Frames are read continuously and a capture is only filed when a matric number
+                  matching <span className="font-mono">{pattern}</span> is detected together with a score.
                 </p>
               </div>
-
-              <div className="relative mx-auto w-full max-w-2xl aspect-video overflow-hidden rounded-sm border border-border bg-secondary">
-                <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
-                {!liveOn && (
-                  <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                    Camera off
-                  </div>
-                )}
-              </div>
-
               <div className="flex flex-wrap justify-center gap-2">
-                {!liveOn ? (
-                  <Button onClick={startLive} className="gap-2"><Play className="h-4 w-4" /> Start live scan</Button>
-                ) : (
-                  <>
-                    <Button onClick={grabFrame} variant="secondary" className="gap-2"><Camera className="h-4 w-4" /> Capture now</Button>
-                    <Button onClick={() => setAutoCapture((a) => !a)} variant="outline" className="gap-2">
-                      {autoCapture ? "Pause auto-capture" : "Resume auto-capture"}
-                    </Button>
-                    <Button onClick={stopLive} variant="destructive" className="gap-2"><Square className="h-4 w-4" /> Stop</Button>
-                  </>
-                )}
-                {liveOn && <Badge variant="secondary" className="rounded-sm">{liveCaptured} captured</Badge>}
+                <Button onClick={startLive} size="lg" className="gap-2"><Play className="h-4 w-4" /> Start live scan</Button>
               </div>
             </Card>
           </TabsContent>
