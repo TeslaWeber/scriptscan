@@ -111,6 +111,9 @@ function Index() {
   const [liveOn, setLiveOn] = useState(false);
   const [autoCapture, setAutoCapture] = useState(true);
   const [liveCaptured, setLiveCaptured] = useState(0);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [liveHint, setLiveHint] = useState("");
   const liveBusy = useRef(false);
   const seenMatrics = useRef<Set<string>>(new Set());
 
