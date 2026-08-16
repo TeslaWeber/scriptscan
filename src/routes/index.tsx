@@ -624,24 +624,44 @@ function Index() {
     loadSaved(search.course);
   }, [user, isStaff, search.course, loadSaved]);
 
+  /**
+   * Exports EXACTLY the entries currently on this page — nothing else from the
+   * archive — then wipes the console so the next batch starts from scratch.
+   */
   const exportScores = async () => {
     if (!course.trim()) { toast.error("Enter course code"); return; }
     setExportingScores(true);
     try {
-      const { data, error } = await supabase
-        .from("scripts").select("matric,score").eq("course", course.trim())
-        .not("matric", "is", null).not("score", "is", null).order("matric");
-      if (error) { toast.error(error.message); return; }
-      if (!data?.length) { toast.error("No saved scores for this course"); return; }
-      const rows: (string | number)[][] = [["MATRIC NO.", "SCORE"], ...data.map((r) => [r.matric as string, Number(r.score)])];
+      const byMatric = new Map<string, number>();
+      for (const r of records) {
+        const m = r.matric.toUpperCase().trim();
+        const parsed = parseScore(r.score);
+        if (!m || !matricRegex.test(m) || parsed.score == null || !parsed.ok) continue;
+        byMatric.set(m, parsed.score); // last edit for a matric wins — no duplicates
+      }
+      const entries = [...byMatric.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      if (!entries.length) { toast.error("Nothing complete to export on this page"); return; }
+
+      const rows: (string | number)[][] = [["MATRIC NO.", "SCORE"], ...entries.map(([m, s]) => [m, s])];
       const ws = XLSX.utils.aoa_to_sheet(rows);
       ws["!cols"] = [{ wch: 22 }, { wch: 10 }];
+      ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: 1 } });
       for (let i = 2; i <= rows.length; i++) { const c = ws[`B${i}`]; if (c) c.t = "n"; }
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Scores");
       const filename = `${course.replace(/\s+/g, "_")}_scores.xlsx`;
       XLSX.writeFile(wb, filename);
-      toast.success(`Exported ${data.length} record(s)`, { description: filename });
+      toast.success(`Exported ${entries.length} record(s)`, { description: filename });
+
+      // Fresh slate — this batch is closed.
+      setRecords([]);
+      fileMap.current.clear();
+      seenMatrics.current = new Set();
+      setTranscript("");
+      setProgress(0);
+      setCourse("");
+      setReviewCount(null);
+      openedRef.current = true;
     } finally { setExportingScores(false); }
   };
 
