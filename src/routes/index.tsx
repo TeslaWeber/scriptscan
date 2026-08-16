@@ -856,26 +856,11 @@ function Index() {
                               className={`font-mono ${r.score && !scoreValid ? "border-destructive" : ""}`}
                               placeholder="e.g. 45 or 45/60"
                             />
-                            {r.score && parsed.ok && (
-                              <p className="text-[11px] text-muted-foreground mt-1">
-                                Score: <strong>{parsed.score}</strong>{parsed.total != null ? <> · out of <strong>{parsed.total}</strong></> : null}
-                              </p>
-                            )}
                             {r.score && !parsed.ok && (
                               <p className="text-[11px] text-destructive mt-1">Invalid: {parsed.reason}</p>
                             )}
                           </div>
                           <Button size="sm" onClick={() => saveEdited(r)}>Save</Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => rescan(r)}
-                            disabled={!hasFile || r.status === "scanning"}
-                            title={hasFile ? "Re-read the original image" : "Original image not in this session"}
-                            className="gap-1"
-                          >
-                            <RefreshCw className={`h-3 w-3 ${r.status === "scanning" ? "animate-spin" : ""}`} /> Re-scan
-                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)} title={r.dbId ? "Delete permanently" : "Remove"}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
