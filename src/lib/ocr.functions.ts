@@ -16,6 +16,7 @@ From the script image, extract:
 1. The student's MATRICULATION NUMBER (often handwritten or printed at the top, e.g. "CSC/2020/123" or "20/1234EE" or "U2019/1234567"). Normalize to uppercase, remove spaces.
 2. The lecturer's SCORE, written as "score/total" — usually circled, boxed, or highlighted in red/blue ink at the top corner. Examples: "45/60", "12/20", "78/100".
 
+Also report the bounding box of each detected value as [x, y, width, height] using fractions of the image width/height (0..1).
 If a value is unreadable or missing, return null for it. Be tolerant of handwriting, ink color, and orientation.`;
 
     const tools = [
@@ -32,6 +33,16 @@ If a value is unreadable or missing, return null for it. Be tolerant of handwrit
               total: { type: ["number", "null"], description: "The denominator (max score)" },
               confidence: { type: "string", enum: ["high", "medium", "low"] },
               notes: { type: "string" },
+              matric_box: {
+                type: ["array", "null"],
+                description: "Bounding box of the matric number as [x, y, width, height] in 0..1 fractions of the image",
+                items: { type: "number" },
+              },
+              score_box: {
+                type: ["array", "null"],
+                description: "Bounding box of the score as [x, y, width, height] in 0..1 fractions of the image",
+                items: { type: "number" },
+              },
             },
             required: ["matric_no", "score", "total", "confidence"],
             additionalProperties: false,
@@ -78,5 +89,7 @@ If a value is unreadable or missing, return null for it. Be tolerant of handwrit
       total: number | null;
       confidence: "high" | "medium" | "low";
       notes?: string;
+      matric_box?: number[] | null;
+      score_box?: number[] | null;
     };
   });
