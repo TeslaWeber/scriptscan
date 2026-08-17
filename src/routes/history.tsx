@@ -131,8 +131,8 @@ function History() {
                   {r.incomplete > 0 && (
                     <Badge variant="destructive" className="rounded-sm gap-1"><AlertTriangle className="h-3 w-3" />{r.incomplete} incomplete</Badge>
                   )}
-                  <Link to="/" search={{ course: r.course }}>
-                    <Button variant="secondary" size="sm" className="gap-1"><FolderOpen className="h-4 w-4" /> Open</Button>
+                  <Link to="/history/$course" params={{ course: r.course }}>
+                    <Button variant="secondary" size="sm" className="gap-1"><FolderOpen className="h-4 w-4" /> Edit</Button>
                   </Link>
                   <Button size="sm" className="gap-1" onClick={() => exportCourse(r.course)} disabled={exporting === r.course}>
                     {exporting === r.course ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} Excel
