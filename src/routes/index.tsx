@@ -12,7 +12,12 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster, toast } from "sonner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { extractScript } from "@/lib/ocr.functions";
+import { downloadScoresWorkbook, saveExportVersion, type ExportRow } from "@/lib/exportVersions";
 import { extractFromAudio } from "@/lib/audio.functions";
 import { DEFAULT_MATRIC_SAMPLE, patternToRegex, describePattern } from "@/lib/matric";
 import { supabase } from "@/integrations/supabase/client";
@@ -93,6 +98,8 @@ function Index() {
   const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isStaff, setIsStaff] = useState(false);
+  const [roleChecked, setRoleChecked] = useState(false);
+  const [confirmExport, setConfirmExport] = useState(false);
   const [course, setCourse] = useState(search.course ?? "");
   const [pattern, setPattern] = useState(DEFAULT_MATRIC_SAMPLE);
   const [records, setRecords] = useState<Rec[]>([]);
@@ -113,6 +120,9 @@ function Index() {
   const [liveCaptured, setLiveCaptured] = useState(0);
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
+  const [speedMode, setSpeedMode] = useState<"fast" | "standard">("fast");
+  const [captureInterval, setCaptureInterval] = useState(700);
+  const [boxes, setBoxes] = useState<{ matric?: number[] | null; score?: number[] | null; label?: string }>({});
   const [liveHint, setLiveHint] = useState("");
   const liveBusy = useRef(false);
   const seenMatrics = useRef<Set<string>>(new Set());
@@ -147,9 +157,10 @@ function Index() {
         setTimeout(() => {
           supabase.from("user_roles").select("role").eq("user_id", session.user.id).then(({ data }) => {
             setIsStaff((data ?? []).some((r) => r.role === "staff" || r.role === "admin"));
+            setRoleChecked(true);
           });
         }, 0);
-      } else setIsStaff(false);
+      } else { setIsStaff(false); setRoleChecked(true); }
     });
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
@@ -158,6 +169,7 @@ function Index() {
       else {
         supabase.from("user_roles").select("role").eq("user_id", data.session.user.id).then(({ data: roles }) => {
           setIsStaff((roles ?? []).some((r) => r.role === "staff" || r.role === "admin"));
+          setRoleChecked(true);
         });
       }
     });
@@ -325,6 +337,7 @@ function Index() {
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setLiveOn(false);
+    setBoxes({});
     setTorchOn(false);
     setTorchSupported(false);
   }, []);
@@ -420,6 +433,11 @@ function Index() {
       const matric = (result.matric_no ?? "").toUpperCase().replace(/\s+/g, "");
       const valid = !!matric && matricRegex.test(matric);
       const hasScore = result.score != null;
+      setBoxes({
+        matric: valid ? result.matric_box : null,
+        score: hasScore ? result.score_box : null,
+        label: `${valid ? matric : "—"} · ${hasScore ? result.score : "—"}`,
+      });
       if (!valid || !hasScore) {
         setLiveHint(!valid ? "No matching matric number in view…" : "Matric found — waiting for a score…");
         return;
@@ -470,9 +488,11 @@ function Index() {
 
   useEffect(() => {
     if (!liveOn || !autoCapture) return;
-    const id = setInterval(() => { scanTick(); }, 900);
+    const id = setInterval(() => { scanTick(); }, captureInterval);
     return () => clearInterval(id);
-  }, [liveOn, autoCapture, scanTick]);
+  }, [liveOn, autoCapture, scanTick, captureInterval]);
+
+  useEffect(() => { setCaptureInterval(speedMode === "fast" ? 700 : 1800); }, [speedMode]);
 
   // ================= VOICE CAPTURE =================
   const startRecording = async () => {
@@ -632,26 +652,20 @@ function Index() {
     if (!course.trim()) { toast.error("Enter course code"); return; }
     setExportingScores(true);
     try {
-      const byMatric = new Map<string, number>();
+      const byMatric = new Map<string, ExportRow>();
       for (const r of records) {
         const m = r.matric.toUpperCase().trim();
         const parsed = parseScore(r.score);
         if (!m || !matricRegex.test(m) || parsed.score == null || !parsed.ok) continue;
-        byMatric.set(m, parsed.score); // last edit for a matric wins — no duplicates
+        byMatric.set(m, { matric: m, score: parsed.score, confidence: r.confidence ?? "", error: r.error ?? r.notes ?? "" });
       }
-      const entries = [...byMatric.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      const entries = [...byMatric.values()].sort((a, b) => a.matric.localeCompare(b.matric));
       if (!entries.length) { toast.error("Nothing complete to export on this page"); return; }
 
-      const rows: (string | number)[][] = [["MATRIC NO.", "SCORE"], ...entries.map(([m, s]) => [m, s])];
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws["!cols"] = [{ wch: 22 }, { wch: 10 }];
-      ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: 1 } });
-      for (let i = 2; i <= rows.length; i++) { const c = ws[`B${i}`]; if (c) c.t = "n"; }
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Scores");
-      const filename = `${course.replace(/\s+/g, "_")}_scores.xlsx`;
-      XLSX.writeFile(wb, filename);
-      toast.success(`Exported ${entries.length} record(s)`, { description: filename });
+      const saved = await saveExportVersion(course.trim(), entries);
+      const filename = saved?.filename ?? `${course.replace(/\s+/g, "_")}_scores.xlsx`;
+      downloadScoresWorkbook(entries, filename);
+      toast.success(`Exported ${entries.length} record(s)${saved?.version ? ` — version ${saved.version}` : ""}`, { description: filename });
 
       // Fresh slate — this batch is closed.
       setRecords([]);
@@ -667,7 +681,7 @@ function Index() {
 
   const signOut = async () => { await supabase.auth.signOut(); navigate({ to: "/auth" }); };
 
-  if (!authChecked) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  if (!authChecked || (user && !roleChecked)) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (!user) return null;
   if (!isStaff) {
     return (
@@ -692,6 +706,28 @@ function Index() {
         <div className="fixed inset-0 z-50 bg-black">
           <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />
 
+          {/* OCR bounding-box preview */}
+          {(boxes.matric || boxes.score) && (
+            <div className="pointer-events-none absolute inset-0">
+              {boxes.matric && boxes.matric.length === 4 && (
+                <div
+                  className="absolute border-2 border-[color:var(--color-brass)]"
+                  style={{ left: `${boxes.matric[0] * 100}%`, top: `${boxes.matric[1] * 100}%`, width: `${boxes.matric[2] * 100}%`, height: `${boxes.matric[3] * 100}%` }}
+                >
+                  <span className="absolute -top-5 left-0 text-[10px] uppercase tracking-widest bg-[color:var(--color-brass)] text-black px-1">Matric</span>
+                </div>
+              )}
+              {boxes.score && boxes.score.length === 4 && (
+                <div
+                  className="absolute border-2 border-emerald-400"
+                  style={{ left: `${boxes.score[0] * 100}%`, top: `${boxes.score[1] * 100}%`, width: `${boxes.score[2] * 100}%`, height: `${boxes.score[3] * 100}%` }}
+                >
+                  <span className="absolute -top-5 left-0 text-[10px] uppercase tracking-widest bg-emerald-400 text-black px-1">Score</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* guide frame */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
             <div className="w-full max-w-xl aspect-[4/3] rounded-sm border-2 border-[color:var(--color-brass)]/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
@@ -708,6 +744,20 @@ function Index() {
                 <X className="h-5 w-5" />
               </Button>
             </div>
+          </div>
+
+          <div className="absolute bottom-24 inset-x-0 px-6 flex flex-col items-center gap-2 text-white">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest">
+              <button type="button" onClick={() => setSpeedMode("fast")} className={`px-2 py-1 rounded-sm border ${speedMode === "fast" ? "bg-white/20 border-white" : "border-white/40"}`}>Fast</button>
+              <button type="button" onClick={() => setSpeedMode("standard")} className={`px-2 py-1 rounded-sm border ${speedMode === "standard" ? "bg-white/20 border-white" : "border-white/40"}`}>Standard</button>
+              <span className="opacity-80">{captureInterval} ms</span>
+            </div>
+            <input
+              type="range" min={300} max={3000} step={100} value={captureInterval}
+              onChange={(e) => setCaptureInterval(Number(e.target.value))}
+              className="w-56 accent-[color:var(--color-brass)]"
+              aria-label="Capture interval"
+            />
           </div>
 
           <div className="absolute bottom-0 inset-x-0 p-5 pb-8 flex items-center justify-center gap-4">
@@ -735,6 +785,22 @@ function Index() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={confirmExport} onOpenChange={setConfirmExport}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Export and clear this page?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A new numbered version of <strong>{course}</strong> will be saved to the history file and downloaded.
+              The entry register on this page will then be cleared so the next batch starts fresh. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmExport(false); exportScores(); }}>Export &amp; clear</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <header className="border-b-2 border-primary/80 bg-primary text-primary-foreground">
         <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between gap-3">
@@ -782,7 +848,7 @@ function Index() {
             </div>
           </div>
           <div className="flex flex-wrap gap-3 items-center mt-5 pt-4 border-t border-border">
-            <Button onClick={exportScores} disabled={!course.trim() || exportingScores} className="gap-2">
+            <Button onClick={() => setConfirmExport(true)} disabled={!course.trim() || exportingScores} className="gap-2">
               {exportingScores ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
               Export Scores .xlsx
             </Button>
