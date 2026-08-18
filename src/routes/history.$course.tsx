@@ -1,13 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, FileSpreadsheet, Loader2, Trash2, GraduationCap, Save } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, Loader2, Trash2, GraduationCap, Save, History as HistoryIcon, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Toaster, toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from "xlsx";
+import { downloadScoresWorkbook, saveExportVersion, type ExportRow, type ExportVersion } from "@/lib/exportVersions";
 
 export const Route = createFileRoute("/history/$course")({
   head: ({ params }) => ({
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/history/$course")({
   component: HistoryCourse,
 });
 
-type Row = { id: string; matric: string; score: string; dirty?: boolean };
+type Row = { id: string; matric: string; score: string; confidence?: string | null; error?: string | null; dirty?: boolean };
 
 function HistoryCourse() {
   const { course } = Route.useParams();
@@ -30,26 +30,36 @@ function HistoryCourse() {
   const [rows, setRows] = useState<Row[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [versions, setVersions] = useState<ExportVersion[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("scripts").select("id,matric,score").eq("course", course).order("matric");
+      .from("scripts").select("id,matric,score,confidence,error").eq("course", course).order("matric");
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    setRows((data ?? []).map((d) => ({
+    setRows((data ?? []).map((d: any) => ({
       id: d.id,
       matric: d.matric ?? "",
       score: d.score != null ? String(d.score) : "",
+      confidence: d.confidence ?? "",
+      error: d.error ?? "",
     })));
+  }, [course]);
+
+  const loadVersions = useCallback(async () => {
+    const { data } = await supabase
+      .from("export_versions").select("*").eq("course", course).order("version", { ascending: false });
+    setVersions((data ?? []) as unknown as ExportVersion[]);
   }, [course]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) { navigate({ to: "/auth" }); return; }
       load();
+      loadVersions();
     });
-  }, [navigate, load]);
+  }, [navigate, load, loadVersions]);
 
   const update = (id: string, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch, dirty: true } : r)));
@@ -77,26 +87,35 @@ function HistoryCourse() {
   const reExport = async () => {
     setExporting(true);
     try {
-      const byMatric = new Map<string, number>();
+      const byMatric = new Map<string, ExportRow>();
       for (const r of rows) {
         const m = r.matric.trim().toUpperCase();
         const s = Number(r.score);
         if (!m || r.score.trim() === "" || !Number.isFinite(s)) continue;
-        byMatric.set(m, s);
+        byMatric.set(m, { matric: m, score: s, confidence: r.confidence ?? "", error: r.error ?? "" });
       }
-      const entries = [...byMatric.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      const entries = [...byMatric.values()].sort((a, b) => a.matric.localeCompare(b.matric));
       if (!entries.length) { toast.error("No complete records to export"); return; }
-      const aoa: (string | number)[][] = [["MATRIC NO.", "SCORE"], ...entries.map(([m, s]) => [m, s])];
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws["!cols"] = [{ wch: 22 }, { wch: 10 }];
-      ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: 1 } });
-      for (let i = 2; i <= aoa.length; i++) { const c = ws[`B${i}`]; if (c) c.t = "n"; }
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Scores");
-      const filename = `${course.replace(/\s+/g, "_")}_scores.xlsx`;
-      XLSX.writeFile(wb, filename);
-      toast.success(`Exported ${entries.length} record(s)`, { description: filename });
+      const saved = await saveExportVersion(course, entries);
+      const filename = saved?.filename ?? `${course.replace(/\s+/g, "_")}_scores.xlsx`;
+      downloadScoresWorkbook(entries, filename);
+      await loadVersions();
+      toast.success(`Exported ${entries.length} record(s)${saved?.version ? ` — version ${saved.version}` : ""}`, { description: filename });
     } finally { setExporting(false); }
+  };
+
+  const openVersion = (v: ExportVersion) => {
+    const rowsIn = (v.rows ?? []) as ExportRow[];
+    if (!rowsIn.length) { toast.error("This saved version has no rows"); return; }
+    downloadScoresWorkbook(rowsIn, v.filename);
+    toast.success(`Opened version ${v.version}`, { description: v.filename });
+  };
+
+  const deleteVersion = async (v: ExportVersion) => {
+    const { error } = await supabase.from("export_versions").delete().eq("id", v.id);
+    if (error) { toast.error(error.message); return; }
+    setVersions((vs) => vs.filter((x) => x.id !== v.id));
+    toast.success(`Version ${v.version} removed`);
   };
 
   return (
@@ -160,6 +179,35 @@ function HistoryCourse() {
             ))}
           </div>
         )}
+        <section className="space-y-3 pt-4">
+          <div className="flex items-center gap-2 border-b border-border pb-2">
+            <HistoryIcon className="h-4 w-4 text-muted-foreground" />
+            <h2 className="font-display text-xl">Saved export versions</h2>
+            <span className="text-xs text-muted-foreground">{versions.length} saved</span>
+          </div>
+          {versions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No exports saved yet — each re-export creates a new version here.</p>
+          ) : (
+            <div className="grid gap-2">
+              {versions.map((v) => (
+                <Card key={v.id} className="p-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium">Version {v.version} · {v.record_count} record(s)</p>
+                    <p className="text-xs text-muted-foreground truncate">{v.filename} · {new Date(v.created_at).toLocaleString()}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="secondary" className="gap-1" onClick={() => openVersion(v)}>
+                      <Download className="h-4 w-4" /> Open
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => deleteVersion(v)} title="Delete version">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

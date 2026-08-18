@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Toaster, toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from "xlsx";
+import { downloadScoresWorkbook, saveExportVersion, type ExportRow } from "@/lib/exportVersions";
 
 export const Route = createFileRoute("/history/")({
   head: () => ({
@@ -67,19 +67,17 @@ function History() {
     setExporting(course);
     try {
       const { data, error } = await supabase
-        .from("scripts").select("matric,score").eq("course", course)
+        .from("scripts").select("matric,score,confidence,error").eq("course", course)
         .not("matric", "is", null).not("score", "is", null).order("matric");
       if (error) { toast.error(error.message); return; }
       if (!data?.length) { toast.error("No complete records in this course"); return; }
-      const aoa: (string | number)[][] = [["MATRIC NO.", "SCORE"], ...data.map((r) => [r.matric as string, Number(r.score)])];
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws["!cols"] = [{ wch: 22 }, { wch: 10 }];
-      for (let i = 2; i <= aoa.length; i++) { const c = ws[`B${i}`]; if (c) c.t = "n"; }
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Scores");
-      const filename = `${course.replace(/\s+/g, "_")}_scores.xlsx`;
-      XLSX.writeFile(wb, filename);
-      toast.success(`Exported ${data.length} record(s)`, { description: filename });
+      const entries: ExportRow[] = data.map((r: any) => ({
+        matric: String(r.matric), score: Number(r.score), confidence: r.confidence ?? "", error: r.error ?? "",
+      }));
+      const saved = await saveExportVersion(course, entries);
+      const filename = saved?.filename ?? `${course.replace(/\s+/g, "_")}_scores.xlsx`;
+      downloadScoresWorkbook(entries, filename);
+      toast.success(`Exported ${entries.length} record(s)${saved?.version ? ` — version ${saved.version}` : ""}`, { description: filename });
     } finally { setExporting(null); }
   };
 
