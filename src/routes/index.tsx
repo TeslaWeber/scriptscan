@@ -113,6 +113,15 @@ function Index() {
   const fileMap = useRef<Map<string, File>>(new Map());
   const CONCURRENCY = 4;
 
+  // ---- video sweep state
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const videoAbort = useRef<{ aborted: boolean }>({ aborted: false });
+  const [videoBusy, setVideoBusy] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoStage, setVideoStage] = useState("");
+  const [videoFound, setVideoFound] = useState(0);
+  const [videoStep, setVideoStep] = useState(0.5);
+
   // ---- live scan state
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
