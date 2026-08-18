@@ -19,6 +19,7 @@ import {
 import { extractScript } from "@/lib/ocr.functions";
 import { downloadScoresWorkbook, saveExportVersion, type ExportRow } from "@/lib/exportVersions";
 import { extractFromAudio } from "@/lib/audio.functions";
+import { extractVideoFrames } from "@/lib/videoFrames";
 import { DEFAULT_MATRIC_SAMPLE, patternToRegex, describePattern } from "@/lib/matric";
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
