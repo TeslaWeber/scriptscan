@@ -1010,6 +1010,63 @@ function Index() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="video">
+            <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
+              <div className="text-center space-y-1">
+                <h2 className="font-display text-2xl">Recorded video sweep</h2>
+                <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+                  Upload a video of the scripts being turned over. The footage is walked frame by frame — blurred and
+                  repeated frames are discarded — and every matric number matching <span className="font-mono">{pattern}</span>{" "}
+                  with a score is filed once, automatically.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap justify-center items-center gap-3">
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  hidden
+                  onChange={(e) => { handleVideo(e.target.files?.[0]); e.target.value = ""; }}
+                />
+                <Button onClick={() => videoInputRef.current?.click()} disabled={videoBusy} size="lg" className="gap-2">
+                  <Film className="h-4 w-4" /> Upload video
+                </Button>
+                {videoBusy && (
+                  <Button variant="outline" size="lg" onClick={() => { videoAbort.current.aborted = true; }} className="gap-2">
+                    <X className="h-4 w-4" /> Stop sweep
+                  </Button>
+                )}
+              </div>
+
+              <div className="max-w-md mx-auto space-y-2">
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+                  Sampling interval · {videoStep.toFixed(1)}s {videoStep <= 0.4 ? "(thorough)" : videoStep >= 1 ? "(fastest)" : "(balanced)"}
+                </Label>
+                <input
+                  type="range"
+                  min={0.2}
+                  max={1.5}
+                  step={0.1}
+                  value={videoStep}
+                  disabled={videoBusy}
+                  onChange={(e) => setVideoStep(Number(e.target.value))}
+                  className="w-full accent-[color:var(--color-primary)]"
+                />
+              </div>
+
+              {videoBusy && (
+                <div className="max-w-md mx-auto space-y-2">
+                  <Progress value={videoProgress} />
+                  <p className="text-xs text-muted-foreground flex items-center gap-2 justify-center text-center">
+                    <Loader2 className="h-3 w-3 animate-spin" /> {videoStage} · {videoFound} record(s) filed
+                  </p>
+                </div>
+              )}
+            </Card>
+          </TabsContent>
+
+
           <TabsContent value="voice">
             <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
               <div className="text-center space-y-1">
