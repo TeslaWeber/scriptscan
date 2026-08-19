@@ -1148,6 +1148,12 @@ function Index() {
                       )}
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
+                          {incomplete && (
+                            <Badge variant="destructive" className="gap-1 rounded-sm">
+                              <AlertTriangle className="h-3 w-3" />
+                              Incomplete — {!matricValid && !scoreValid ? "matric & score" : !matricValid ? "matric" : "score"}
+                            </Badge>
+                          )}
                           {r.status === "scanning" && <Badge variant="secondary" className="gap-1 rounded-sm"><Loader2 className="h-3 w-3 animate-spin" />Reading</Badge>}
                           {r.status === "queued" && <Badge variant="outline" className="rounded-sm">Queued</Badge>}
                           {r.status === "error" && <Badge variant="destructive" className="gap-1 rounded-sm"><AlertCircle className="h-3 w-3" />Error</Badge>}
