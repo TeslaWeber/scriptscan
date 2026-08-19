@@ -962,6 +962,7 @@ function Index() {
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" />Photographs</TabsTrigger>
             <TabsTrigger value="live" className="gap-2"><Video className="h-4 w-4" />Live scan</TabsTrigger>
+            <TabsTrigger value="video" className="gap-2"><Film className="h-4 w-4" />Video sweep</TabsTrigger>
             <TabsTrigger value="voice" className="gap-2"><Mic className="h-4 w-4" />Dictation</TabsTrigger>
           </TabsList>
 
