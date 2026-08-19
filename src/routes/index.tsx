@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera, Upload, FileSpreadsheet, Trash2, Loader2, AlertCircle, CheckCircle2, LogOut,
-  AlertTriangle, GitMerge, Mic, Square, Video, Archive, GraduationCap, Play, Zap, ZapOff, X,
+  AlertTriangle, GitMerge, Mic, Square, Video, Archive, GraduationCap, Play, Zap, ZapOff, X, Film,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -962,6 +962,7 @@ function Index() {
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" />Photographs</TabsTrigger>
             <TabsTrigger value="live" className="gap-2"><Video className="h-4 w-4" />Live scan</TabsTrigger>
+            <TabsTrigger value="video" className="gap-2"><Film className="h-4 w-4" />Video sweep</TabsTrigger>
             <TabsTrigger value="voice" className="gap-2"><Mic className="h-4 w-4" />Dictation</TabsTrigger>
           </TabsList>
 
@@ -1008,6 +1009,63 @@ function Index() {
               </div>
             </Card>
           </TabsContent>
+
+          <TabsContent value="video">
+            <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
+              <div className="text-center space-y-1">
+                <h2 className="font-display text-2xl">Recorded video sweep</h2>
+                <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+                  Upload a video of the scripts being turned over. The footage is walked frame by frame — blurred and
+                  repeated frames are discarded — and every matric number matching <span className="font-mono">{pattern}</span>{" "}
+                  with a score is filed once, automatically.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap justify-center items-center gap-3">
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  hidden
+                  onChange={(e) => { handleVideo(e.target.files?.[0]); e.target.value = ""; }}
+                />
+                <Button onClick={() => videoInputRef.current?.click()} disabled={videoBusy} size="lg" className="gap-2">
+                  <Film className="h-4 w-4" /> Upload video
+                </Button>
+                {videoBusy && (
+                  <Button variant="outline" size="lg" onClick={() => { videoAbort.current.aborted = true; }} className="gap-2">
+                    <X className="h-4 w-4" /> Stop sweep
+                  </Button>
+                )}
+              </div>
+
+              <div className="max-w-md mx-auto space-y-2">
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+                  Sampling interval · {videoStep.toFixed(1)}s {videoStep <= 0.4 ? "(thorough)" : videoStep >= 1 ? "(fastest)" : "(balanced)"}
+                </Label>
+                <input
+                  type="range"
+                  min={0.2}
+                  max={1.5}
+                  step={0.1}
+                  value={videoStep}
+                  disabled={videoBusy}
+                  onChange={(e) => setVideoStep(Number(e.target.value))}
+                  className="w-full accent-[color:var(--color-primary)]"
+                />
+              </div>
+
+              {videoBusy && (
+                <div className="max-w-md mx-auto space-y-2">
+                  <Progress value={videoProgress} />
+                  <p className="text-xs text-muted-foreground flex items-center gap-2 justify-center text-center">
+                    <Loader2 className="h-3 w-3 animate-spin" /> {videoStage} · {videoFound} record(s) filed
+                  </p>
+                </div>
+              )}
+            </Card>
+          </TabsContent>
+
 
           <TabsContent value="voice">
             <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
@@ -1066,10 +1124,17 @@ function Index() {
                   const parsed = parseScore(r.score);
                   const scoreValid = parsed.ok;
                   const isDup = matricUpper && (matricCounts.get(matricUpper) ?? 0) > 1;
+                  const incomplete = r.status !== "scanning" && r.status !== "queued" && (!matricValid || !scoreValid);
                   return (
                     <Card
                       key={r.id}
-                      className={`p-3 flex gap-3 items-start ${isDup || r.status === "pending-merge" ? "border-l-4 border-l-[color:var(--color-warning)]" : ""}`}
+                      className={`p-3 flex gap-3 items-start ${
+                        incomplete
+                          ? "border-l-4 border-l-destructive bg-destructive/5"
+                          : isDup || r.status === "pending-merge"
+                            ? "border-l-4 border-l-[color:var(--color-warning)]"
+                            : ""
+                      }`}
                       style={{ boxShadow: "var(--shadow-card)" }}
                     >
                       {r.preview ? (
@@ -1083,6 +1148,12 @@ function Index() {
                       )}
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
+                          {incomplete && (
+                            <Badge variant="destructive" className="gap-1 rounded-sm">
+                              <AlertTriangle className="h-3 w-3" />
+                              Incomplete — {!matricValid && !scoreValid ? "matric & score" : !matricValid ? "matric" : "score"}
+                            </Badge>
+                          )}
                           {r.status === "scanning" && <Badge variant="secondary" className="gap-1 rounded-sm"><Loader2 className="h-3 w-3 animate-spin" />Reading</Badge>}
                           {r.status === "queued" && <Badge variant="outline" className="rounded-sm">Queued</Badge>}
                           {r.status === "error" && <Badge variant="destructive" className="gap-1 rounded-sm"><AlertCircle className="h-3 w-3" />Error</Badge>}
