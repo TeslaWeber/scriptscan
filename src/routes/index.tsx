@@ -1124,10 +1124,17 @@ function Index() {
                   const parsed = parseScore(r.score);
                   const scoreValid = parsed.ok;
                   const isDup = matricUpper && (matricCounts.get(matricUpper) ?? 0) > 1;
+                  const incomplete = r.status !== "scanning" && r.status !== "queued" && (!matricValid || !scoreValid);
                   return (
                     <Card
                       key={r.id}
-                      className={`p-3 flex gap-3 items-start ${isDup || r.status === "pending-merge" ? "border-l-4 border-l-[color:var(--color-warning)]" : ""}`}
+                      className={`p-3 flex gap-3 items-start ${
+                        incomplete
+                          ? "border-l-4 border-l-destructive bg-destructive/5"
+                          : isDup || r.status === "pending-merge"
+                            ? "border-l-4 border-l-[color:var(--color-warning)]"
+                            : ""
+                      }`}
                       style={{ boxShadow: "var(--shadow-card)" }}
                     >
                       {r.preview ? (
