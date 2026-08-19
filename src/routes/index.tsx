@@ -328,6 +328,8 @@ function Index() {
   }, [course, user, matricRegex, refreshReviewCount, runOcr]);
 
   // ================= VIDEO SWEEP =================
+  const confRank = (c?: string) => (c === "high" ? 3 : c === "medium" ? 2 : c === "low" ? 1 : 0);
+
   const handleVideo = useCallback(async (file: File | null | undefined) => {
     if (!file) return;
     if (!course.trim()) { toast.error("Enter a course code first"); return; }
@@ -337,24 +339,82 @@ function Index() {
     setVideoStage("Reading video…");
     setVideoFound(0);
 
-    try {
-      const frames = await extractVideoFrames(file, {
-        step: videoStep,
-        onProgress: (pct, found) => {
-          setVideoProgress(Math.round(pct * 0.4));
-          setVideoStage(`Scanning footage… ${pct}% · ${found} distinct script frame(s)`);
-        },
-        signal: videoAbort.current,
-      });
+    const capTotal = maxScore.trim() && Number.isFinite(Number(maxScore)) ? Number(maxScore) : null;
 
-      if (videoAbort.current.aborted) { toast.info("Video sweep cancelled"); return; }
-      if (!frames.length) { toast.error("No readable frames found in that video"); return; }
+    type Det = {
+      recId: string;
+      matric: string;
+      score: number;
+      total: number | null;
+      confidence?: string;
+      notes?: string;
+      votes: Map<number, number>;
+      preview: string;
+      fileName: string;
+    };
+    const dets = new Map<string, Det>(); // matric -> best detection
 
-      setVideoStage(`Extracting data from ${frames.length} frame(s)…`);
-      const seen = new Set(
-        records.map((r) => r.matric.toUpperCase().trim()).filter(Boolean),
-      );
+    /** Smart dedup: repeated sightings of the same matric collapse into one row. */
+    const ingest = (
+      matric: string,
+      result: { score: number; total: number | null; confidence?: string; notes?: string },
+      frame: { time: number; blob: Blob; preview: string },
+    ) => {
+      const existing = dets.get(matric);
+      const stamp = new Date(frame.time * 1000).toISOString().slice(14, 19);
+      const fileName = `video-${stamp}.jpg`;
+      const plausible = (s: number, t: number | null) => {
+        const cap = t ?? capTotal;
+        return s >= 0 && (cap == null || s <= cap);
+      };
 
+      if (!existing) {
+        const recId = crypto.randomUUID();
+        const det: Det = {
+          recId, matric, score: result.score, total: result.total ?? capTotal,
+          confidence: result.confidence, notes: result.notes,
+          votes: new Map([[result.score, 1]]), preview: frame.preview, fileName,
+        };
+        dets.set(matric, det);
+        fileMap.current.set(recId, new File([frame.blob], fileName, { type: "image/jpeg" }));
+        setRecords((rs) => [...rs, {
+          id: recId, fileName, preview: frame.preview, status: "done", matric,
+          score: String(det.score), total: det.total != null ? String(det.total) : "",
+          confidence: det.confidence, notes: det.notes,
+        }]);
+        setVideoFound((n) => n + 1);
+        return;
+      }
+
+      existing.votes.set(result.score, (existing.votes.get(result.score) ?? 0) + 1);
+      const better =
+        (plausible(result.score, result.total) && !plausible(existing.score, existing.total)) ||
+        (plausible(result.score, result.total) === plausible(existing.score, existing.total) &&
+          (confRank(result.confidence) > confRank(existing.confidence) ||
+            (confRank(result.confidence) === confRank(existing.confidence) &&
+              (existing.votes.get(result.score) ?? 0) > (existing.votes.get(existing.score) ?? 0))));
+
+      if (better) {
+        existing.score = result.score;
+        existing.total = result.total ?? existing.total ?? capTotal;
+        existing.confidence = result.confidence;
+        existing.notes = result.notes;
+        existing.preview = frame.preview;
+        fileMap.current.set(existing.recId, new File([frame.blob], existing.fileName, { type: "image/jpeg" }));
+        updateRecord(existing.recId, {
+          score: String(existing.score),
+          total: existing.total != null ? String(existing.total) : "",
+          confidence: existing.confidence,
+          notes: existing.notes,
+          preview: frame.preview,
+        });
+      }
+    };
+
+    const readFrames = async (
+      frames: { time: number; blob: Blob; preview: string }[],
+      onTick: (done: number) => void,
+    ) => {
       let done = 0;
       const queue = frames.map((_, i) => i);
       const readFrame = async (i: number) => {
@@ -365,34 +425,19 @@ function Index() {
           const matric = (result.matric_no ?? "").toUpperCase().replace(/\s+/g, "");
           const valid = !!matric && matricRegex.test(matric);
           if (!valid || result.score == null) return;
-          if (seen.has(matric)) return;
-          seen.add(matric);
-
-          const recId = crypto.randomUUID();
-          const stamp = new Date(frame.time * 1000).toISOString().slice(14, 19);
-          const rec: Rec = {
-            id: recId,
-            fileName: `video-${stamp}.jpg`,
-            preview: frame.preview,
-            status: "done",
-            matric,
-            score: String(result.score),
-            total: result.total != null ? String(result.total) : "",
+          ingest(matric, {
+            score: Number(result.score),
+            total: result.total != null ? Number(result.total) : null,
             confidence: result.confidence,
             notes: result.notes,
-          };
-          fileMap.current.set(recId, new File([frame.blob], rec.fileName, { type: "image/jpeg" }));
-          setRecords((rs) => [...rs, rec]);
-          setVideoFound((n) => n + 1);
-          applyPersistResult(recId, await persistRecord(rec));
+          }, frame);
         } catch {
           /* skip unreadable frame, keep the sweep moving */
         } finally {
           done++;
-          setVideoProgress(40 + Math.round((done / frames.length) * 60));
+          onTick(done);
         }
       };
-
       const workers = Array.from({ length: Math.min(CONCURRENCY, frames.length) }, async () => {
         while (queue.length && !videoAbort.current?.aborted) {
           const i = queue.shift();
@@ -401,9 +446,63 @@ function Index() {
         }
       });
       await Promise.all(workers);
+    };
+
+    try {
+      // ---- Pass 1: standard sweep at a fixed 1.0s sampling interval
+      const frames = await extractVideoFrames(file, {
+        step: VIDEO_STEP,
+        onProgress: (pct) => {
+          setVideoProgress(Math.round(pct * 0.25));
+          setVideoStage(`Sweeping footage… ${pct}%`);
+        },
+        signal: videoAbort.current,
+      });
+
+      if (videoAbort.current.aborted) { toast.info("Video sweep cancelled"); return; }
+      if (!frames.length) { toast.error("No readable frames found in that video"); return; }
+
+      setVideoStage(`Reading ${frames.length} frame(s)…`);
+      await readFrames(frames, (done) =>
+        setVideoProgress(25 + Math.round((done / frames.length) * 40)),
+      );
+
+      // ---- Pass 2: automatic reconfirmation — finer, more sensitive sweep so no
+      // script slipped through and every score is double-checked.
+      if (!videoAbort.current.aborted) {
+        setVideoStage("Reconfirming — second pass over the footage…");
+        const recheck = await extractVideoFrames(file, {
+          step: 0.35,
+          diffThreshold: 3,
+          minSharpness: 2,
+          onProgress: (pct) => {
+            setVideoProgress(65 + Math.round(pct * 0.1));
+            setVideoStage(`Reconfirming footage… ${pct}%`);
+          },
+          signal: videoAbort.current,
+        });
+        setVideoStage(`Reconfirming ${recheck.length} frame(s)…`);
+        await readFrames(recheck, (done) =>
+          setVideoProgress(75 + Math.round((done / Math.max(1, recheck.length)) * 25)),
+        );
+      }
+
+      // ---- File every deduplicated row once
+      setVideoStage("Filing records…");
+      for (const det of dets.values()) {
+        const rec: Rec = {
+          id: det.recId, fileName: det.fileName, preview: det.preview, status: "done",
+          matric: det.matric, score: String(det.score),
+          total: det.total != null ? String(det.total) : "",
+          confidence: det.confidence, notes: det.notes,
+        };
+        applyPersistResult(det.recId, await persistRecord(rec));
+      }
 
       setVideoProgress(100);
-      toast.success("Video sweep complete", { description: `${seen.size} matric number(s) on the register` });
+      toast.success("Video sweep complete", {
+        description: `${dets.size} matric number(s) confirmed after two passes`,
+      });
       refreshReviewCount();
     } catch (e: any) {
       toast.error(e?.message ?? "Could not process that video");
@@ -411,171 +510,7 @@ function Index() {
       setVideoBusy(false);
       setVideoStage("");
     }
-  }, [course, user, matricRegex, refreshReviewCount, records, videoStep]);
-
-
-  // ================= LIVE SCAN =================
-  const stopLive = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
-    setLiveOn(false);
-    setBoxes({});
-    setTorchOn(false);
-    setTorchSupported(false);
-  }, []);
-
-  useEffect(() => () => { streamRef.current?.getTracks().forEach((t) => t.stop()); }, []);
-
-  const startLive = async () => {
-    if (!course.trim()) { toast.error("Enter a course code first"); return; }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      const track = stream.getVideoTracks()[0];
-      const caps: any = track?.getCapabilities?.() ?? {};
-      setTorchSupported(!!caps.torch);
-      setLiveOn(true);
-      setLiveCaptured(0);
-      setLiveHint("Searching for a script…");
-      seenMatrics.current = new Set();
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
-        }
-      });
-    } catch (e: any) {
-      toast.error("Camera unavailable", { description: e?.message });
-    }
-  };
-
-  const toggleTorch = async () => {
-    const track = streamRef.current?.getVideoTracks()[0];
-    if (!track) return;
-    const next = !torchOn;
-    try {
-      await track.applyConstraints({ advanced: [{ torch: next }] } as any);
-      setTorchOn(next);
-    } catch {
-      toast.error("Flashlight not available on this device");
-    }
-  };
-
-  /** Snapshot the current video frame as a JPEG blob + small preview. */
-  const snapshot = (): { blob: Promise<Blob | null>; preview: string } | null => {
-    const video = videoRef.current;
-    if (!video || video.videoWidth === 0) return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
-    return {
-      blob: new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.85)),
-      preview: canvas.toDataURL("image/jpeg", 0.5),
-    };
-  };
-
-  const fileLiveCapture = useCallback(
-    async (blob: Blob, preview: string, ocr: { matric: string; score: string; total: string; confidence?: string; notes?: string }) => {
-      const recId = crypto.randomUUID();
-      const rec: Rec = {
-        id: recId,
-        fileName: `live-${new Date().toISOString().slice(11, 19)}.jpg`,
-        preview,
-        status: "done",
-        matric: ocr.matric,
-        score: ocr.score,
-        total: ocr.total,
-        confidence: ocr.confidence,
-        notes: ocr.notes,
-      };
-      fileMap.current.set(recId, new File([blob], rec.fileName, { type: "image/jpeg" }));
-      setRecords((rs) => [...rs, rec]);
-      applyPersistResult(recId, await persistRecord(rec));
-      setLiveCaptured((n) => n + 1);
-      refreshReviewCount();
-    },
-    [course, user, matricRegex, refreshReviewCount],
-  );
-
-  /** Continuous read: only files a capture when a valid matric AND a score are visible. */
-  const scanTick = useCallback(async () => {
-    if (liveBusy.current) return;
-    const shot = snapshot();
-    if (!shot) return;
-    liveBusy.current = true;
-    try {
-      const blob = await shot.blob;
-      if (!blob) return;
-      const { base64, mime } = await fileToBase64(blob);
-      const result = await extractScript({ data: { imageBase64: base64, mimeType: mime } });
-      const matric = (result.matric_no ?? "").toUpperCase().replace(/\s+/g, "");
-      const valid = !!matric && matricRegex.test(matric);
-      const hasScore = result.score != null;
-      setBoxes({
-        matric: valid ? result.matric_box : null,
-        score: hasScore ? result.score_box : null,
-        label: `${valid ? matric : "—"} · ${hasScore ? result.score : "—"}`,
-      });
-      if (!valid || !hasScore) {
-        setLiveHint(!valid ? "No matching matric number in view…" : "Matric found — waiting for a score…");
-        return;
-      }
-      if (seenMatrics.current.has(matric)) { setLiveHint(`${matric} already captured — next script`); return; }
-      seenMatrics.current.add(matric);
-      setLiveHint(`Captured ${matric} · ${result.score}`);
-      await fileLiveCapture(blob, shot.preview, {
-        matric,
-        score: String(result.score),
-        total: result.total != null ? String(result.total) : "",
-        confidence: result.confidence,
-        notes: result.notes,
-      });
-    } catch {
-      /* keep the live loop alive on a failed frame */
-    } finally {
-      liveBusy.current = false;
-    }
-  }, [matricRegex, fileLiveCapture]);
-
-  /** Manual shutter — files whatever is read, valid or not. */
-  const grabFrame = useCallback(async () => {
-    if (liveBusy.current) return;
-    const shot = snapshot();
-    if (!shot) return;
-    liveBusy.current = true;
-    try {
-      const blob = await shot.blob;
-      if (!blob) return;
-      const { base64, mime } = await fileToBase64(blob);
-      const result = await extractScript({ data: { imageBase64: base64, mimeType: mime } });
-      const matric = (result.matric_no ?? "").toUpperCase().replace(/\s+/g, "");
-      if (matric) seenMatrics.current.add(matric);
-      await fileLiveCapture(blob, shot.preview, {
-        matric,
-        score: result.score != null ? String(result.score) : "",
-        total: result.total != null ? String(result.total) : "",
-        confidence: result.confidence,
-        notes: result.notes,
-      });
-    } catch (e: any) {
-      toast.error("Capture failed", { description: e?.message });
-    } finally {
-      liveBusy.current = false;
-    }
-  }, [fileLiveCapture]);
-
-  useEffect(() => {
-    if (!liveOn || !autoCapture) return;
-    const id = setInterval(() => { scanTick(); }, captureInterval);
-    return () => clearInterval(id);
-  }, [liveOn, autoCapture, scanTick, captureInterval]);
-
-  useEffect(() => { setCaptureInterval(speedMode === "fast" ? 700 : 1800); }, [speedMode]);
+  }, [course, user, matricRegex, refreshReviewCount, maxScore]);
 
   // ================= VOICE CAPTURE =================
   const startRecording = async () => {
