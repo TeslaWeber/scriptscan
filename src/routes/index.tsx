@@ -120,22 +120,8 @@ function Index() {
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoStage, setVideoStage] = useState("");
   const [videoFound, setVideoFound] = useState(0);
-  const [videoStep, setVideoStep] = useState(0.5);
-
-  // ---- live scan state
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const [liveOn, setLiveOn] = useState(false);
-  const [autoCapture, setAutoCapture] = useState(true);
-  const [liveCaptured, setLiveCaptured] = useState(0);
-  const [torchOn, setTorchOn] = useState(false);
-  const [torchSupported, setTorchSupported] = useState(false);
-  const [speedMode, setSpeedMode] = useState<"fast" | "standard">("fast");
-  const [captureInterval, setCaptureInterval] = useState(700);
-  const [boxes, setBoxes] = useState<{ matric?: number[] | null; score?: number[] | null; label?: string }>({});
-  const [liveHint, setLiveHint] = useState("");
-  const liveBusy = useRef(false);
-  const seenMatrics = useRef<Set<string>>(new Set());
+  const VIDEO_STEP = 1.0;
+  const [maxScore, setMaxScore] = useState("");
 
   // ---- voice state
   const recorderRef = useRef<MediaRecorder | null>(null);
