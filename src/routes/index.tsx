@@ -763,13 +763,13 @@ function Index() {
         <section>
           <h1 className="font-display text-3xl sm:text-4xl">Examination Capture Console</h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Digitize marked scripts through photographs, a live camera sweep, or spoken dictation — then compile a clean
+            Digitize marked scripts through photographs, a recorded video sweep, or spoken dictation — then compile a clean
             <span className="font-medium text-foreground"> MATRIC NO. / SCORE </span> spreadsheet.
           </p>
         </section>
 
         <Card className="p-5 border-t-4 border-t-[color:var(--color-brass)]" style={{ boxShadow: "var(--shadow-card)" }}>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="course" className="text-xs uppercase tracking-widest text-muted-foreground">Course code *</Label>
               <Input id="course" placeholder="e.g. CSC 301" value={course} onChange={(e) => setCourse(e.target.value)} />
@@ -778,6 +778,20 @@ function Index() {
               <Label htmlFor="pattern" className="text-xs uppercase tracking-widest text-muted-foreground">Matric pattern (sample)</Label>
               <Input id="pattern" value={pattern} onChange={(e) => setPattern(e.target.value)} className="font-mono" placeholder={DEFAULT_MATRIC_SAMPLE} />
               <p className="text-[11px] text-muted-foreground">{describePattern(pattern)}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="maxscore" className="text-xs uppercase tracking-widest text-muted-foreground">Graded over (total)</Label>
+              <Input
+                id="maxscore"
+                value={maxScore}
+                onChange={(e) => setMaxScore(e.target.value)}
+                inputMode="numeric"
+                className="font-mono"
+                placeholder="e.g. 60"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {maxScore.trim() ? `Scores checked against a maximum of ${maxScore.trim()}` : "Optional — used to validate detected scores"}
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-3 items-center mt-5 pt-4 border-t border-border">
