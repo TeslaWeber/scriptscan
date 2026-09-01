@@ -859,21 +859,9 @@ function Index() {
                 )}
               </div>
 
-              <div className="max-w-md mx-auto space-y-2">
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground">
-                  Sampling interval · {videoStep.toFixed(1)}s {videoStep <= 0.4 ? "(thorough)" : videoStep >= 1 ? "(fastest)" : "(balanced)"}
-                </Label>
-                <input
-                  type="range"
-                  min={0.2}
-                  max={1.5}
-                  step={0.1}
-                  value={videoStep}
-                  disabled={videoBusy}
-                  onChange={(e) => setVideoStep(Number(e.target.value))}
-                  className="w-full accent-[color:var(--color-primary)]"
-                />
-              </div>
+              <p className="text-center text-[11px] uppercase tracking-widest text-muted-foreground">
+                Sampling interval fixed at {VIDEO_STEP.toFixed(1)}s · automatic reconfirmation pass included
+              </p>
 
               {videoBusy && (
                 <div className="max-w-md mx-auto space-y-2">
