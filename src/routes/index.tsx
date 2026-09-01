@@ -196,7 +196,8 @@ function Index() {
     const matric = r.matric ? r.matric.toUpperCase().trim() : null;
     const parsed = parseScore(r.score);
     const scoreNum = parsed.score;
-    const totalNum = parsed.total ?? (r.total !== "" && Number.isFinite(Number(r.total)) ? Number(r.total) : null);
+    const fallbackTotal = maxScore.trim() && Number.isFinite(Number(maxScore)) ? Number(maxScore) : null;
+    const totalNum = parsed.total ?? (r.total !== "" && Number.isFinite(Number(r.total)) ? Number(r.total) : fallbackTotal);
     const matricValid = !!matric && matricRegex.test(matric);
     const scoreValid = scoreNum !== null && parsed.ok;
     const needsReview = !matricValid || !scoreValid;
