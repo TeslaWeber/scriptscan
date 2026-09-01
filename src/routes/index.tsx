@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera, Upload, FileSpreadsheet, Trash2, Loader2, AlertCircle, CheckCircle2, LogOut,
-  AlertTriangle, GitMerge, Mic, Square, Video, Archive, GraduationCap, Play, Zap, ZapOff, X, Film,
+  AlertTriangle, GitMerge, Mic, Square, Archive, GraduationCap, X, Film,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -196,7 +196,8 @@ function Index() {
     const matric = r.matric ? r.matric.toUpperCase().trim() : null;
     const parsed = parseScore(r.score);
     const scoreNum = parsed.score;
-    const totalNum = parsed.total ?? (r.total !== "" && Number.isFinite(Number(r.total)) ? Number(r.total) : null);
+    const fallbackTotal = maxScore.trim() && Number.isFinite(Number(maxScore)) ? Number(maxScore) : null;
+    const totalNum = parsed.total ?? (r.total !== "" && Number.isFinite(Number(r.total)) ? Number(r.total) : fallbackTotal);
     const matricValid = !!matric && matricRegex.test(matric);
     const scoreValid = scoreNum !== null && parsed.ok;
     const needsReview = !matricValid || !scoreValid;
@@ -688,7 +689,6 @@ function Index() {
       // Fresh slate — this batch is closed.
       setRecords([]);
       fileMap.current.clear();
-      seenMatrics.current = new Set();
       setTranscript("");
       setProgress(0);
       setCourse("");
@@ -719,90 +719,6 @@ function Index() {
   return (
     <div className="min-h-screen">
       <Toaster richColors position="top-center" />
-
-      {liveOn && (
-        <div className="fixed inset-0 z-50 bg-black">
-          <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />
-
-          {/* OCR bounding-box preview */}
-          {(boxes.matric || boxes.score) && (
-            <div className="pointer-events-none absolute inset-0">
-              {boxes.matric && boxes.matric.length === 4 && (
-                <div
-                  className="absolute border-2 border-[color:var(--color-brass)]"
-                  style={{ left: `${boxes.matric[0] * 100}%`, top: `${boxes.matric[1] * 100}%`, width: `${boxes.matric[2] * 100}%`, height: `${boxes.matric[3] * 100}%` }}
-                >
-                  <span className="absolute -top-5 left-0 text-[10px] uppercase tracking-widest bg-[color:var(--color-brass)] text-black px-1">Matric</span>
-                </div>
-              )}
-              {boxes.score && boxes.score.length === 4 && (
-                <div
-                  className="absolute border-2 border-emerald-400"
-                  style={{ left: `${boxes.score[0] * 100}%`, top: `${boxes.score[1] * 100}%`, width: `${boxes.score[2] * 100}%`, height: `${boxes.score[3] * 100}%` }}
-                >
-                  <span className="absolute -top-5 left-0 text-[10px] uppercase tracking-widest bg-emerald-400 text-black px-1">Score</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* guide frame */}
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
-            <div className="w-full max-w-xl aspect-[4/3] rounded-sm border-2 border-[color:var(--color-brass)]/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
-          </div>
-
-          <div className="absolute top-0 inset-x-0 flex items-center justify-between gap-2 p-4 text-white">
-            <div className="min-w-0">
-              <p className="font-display text-lg leading-tight">{course}</p>
-              <p className="text-xs opacity-80 truncate">{liveHint || "Searching for a script…"}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="rounded-sm">{liveCaptured} captured</Badge>
-              <Button size="icon" variant="ghost" onClick={stopLive} className="text-white hover:bg-white/15" title="Close">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="absolute bottom-24 inset-x-0 px-6 flex flex-col items-center gap-2 text-white">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest">
-              <button type="button" onClick={() => setSpeedMode("fast")} className={`px-2 py-1 rounded-sm border ${speedMode === "fast" ? "bg-white/20 border-white" : "border-white/40"}`}>Fast</button>
-              <button type="button" onClick={() => setSpeedMode("standard")} className={`px-2 py-1 rounded-sm border ${speedMode === "standard" ? "bg-white/20 border-white" : "border-white/40"}`}>Standard</button>
-              <span className="opacity-80">{captureInterval} ms</span>
-            </div>
-            <input
-              type="range" min={300} max={3000} step={100} value={captureInterval}
-              onChange={(e) => setCaptureInterval(Number(e.target.value))}
-              className="w-56 accent-[color:var(--color-brass)]"
-              aria-label="Capture interval"
-            />
-          </div>
-
-          <div className="absolute bottom-0 inset-x-0 p-5 pb-8 flex items-center justify-center gap-4">
-            {torchSupported && (
-              <Button size="icon" variant="ghost" onClick={toggleTorch} className="h-12 w-12 rounded-full text-white hover:bg-white/15" title="Flashlight">
-                {torchOn ? <Zap className="h-6 w-6 text-[color:var(--color-brass)]" /> : <ZapOff className="h-6 w-6" />}
-              </Button>
-            )}
-            <Button
-              onClick={grabFrame}
-              className="h-16 w-16 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 p-0"
-              title="Capture now"
-            >
-              <Camera className="h-6 w-6 text-white" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setAutoCapture((a) => !a)}
-              className="h-12 w-12 rounded-full text-white hover:bg-white/15"
-              title={autoCapture ? "Pause auto-detect" : "Resume auto-detect"}
-            >
-              {autoCapture ? <Square className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-            </Button>
-          </div>
-        </div>
-      )}
 
       <AlertDialog open={confirmExport} onOpenChange={setConfirmExport}>
         <AlertDialogContent>
@@ -848,13 +764,13 @@ function Index() {
         <section>
           <h1 className="font-display text-3xl sm:text-4xl">Examination Capture Console</h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Digitize marked scripts through photographs, a live camera sweep, or spoken dictation — then compile a clean
+            Digitize marked scripts through photographs, a recorded video sweep, or spoken dictation — then compile a clean
             <span className="font-medium text-foreground"> MATRIC NO. / SCORE </span> spreadsheet.
           </p>
         </section>
 
         <Card className="p-5 border-t-4 border-t-[color:var(--color-brass)]" style={{ boxShadow: "var(--shadow-card)" }}>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="course" className="text-xs uppercase tracking-widest text-muted-foreground">Course code *</Label>
               <Input id="course" placeholder="e.g. CSC 301" value={course} onChange={(e) => setCourse(e.target.value)} />
@@ -863,6 +779,20 @@ function Index() {
               <Label htmlFor="pattern" className="text-xs uppercase tracking-widest text-muted-foreground">Matric pattern (sample)</Label>
               <Input id="pattern" value={pattern} onChange={(e) => setPattern(e.target.value)} className="font-mono" placeholder={DEFAULT_MATRIC_SAMPLE} />
               <p className="text-[11px] text-muted-foreground">{describePattern(pattern)}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="maxscore" className="text-xs uppercase tracking-widest text-muted-foreground">Graded over (total)</Label>
+              <Input
+                id="maxscore"
+                value={maxScore}
+                onChange={(e) => setMaxScore(e.target.value)}
+                inputMode="numeric"
+                className="font-mono"
+                placeholder="e.g. 60"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {maxScore.trim() ? `Scores checked against a maximum of ${maxScore.trim()}` : "Optional — used to validate detected scores"}
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-3 items-center mt-5 pt-4 border-t border-border">
@@ -882,7 +812,6 @@ function Index() {
         <Tabs defaultValue="upload">
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" />Photographs</TabsTrigger>
-            <TabsTrigger value="live" className="gap-2"><Video className="h-4 w-4" />Live scan</TabsTrigger>
             <TabsTrigger value="video" className="gap-2"><Film className="h-4 w-4" />Video sweep</TabsTrigger>
             <TabsTrigger value="voice" className="gap-2"><Mic className="h-4 w-4" />Dictation</TabsTrigger>
           </TabsList>
@@ -916,21 +845,6 @@ function Index() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="live">
-            <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
-              <div className="text-center space-y-1">
-                <h2 className="font-display text-2xl">Live camera sweep</h2>
-                <p className="text-sm text-muted-foreground max-w-xl mx-auto">
-                  Opens a full-screen camera. Frames are read continuously and a capture is only filed when a matric number
-                  matching <span className="font-mono">{pattern}</span> is detected together with a score.
-                </p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button onClick={startLive} size="lg" className="gap-2"><Play className="h-4 w-4" /> Start live scan</Button>
-              </div>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="video">
             <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
               <div className="text-center space-y-1">
@@ -960,21 +874,9 @@ function Index() {
                 )}
               </div>
 
-              <div className="max-w-md mx-auto space-y-2">
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground">
-                  Sampling interval · {videoStep.toFixed(1)}s {videoStep <= 0.4 ? "(thorough)" : videoStep >= 1 ? "(fastest)" : "(balanced)"}
-                </Label>
-                <input
-                  type="range"
-                  min={0.2}
-                  max={1.5}
-                  step={0.1}
-                  value={videoStep}
-                  disabled={videoBusy}
-                  onChange={(e) => setVideoStep(Number(e.target.value))}
-                  className="w-full accent-[color:var(--color-primary)]"
-                />
-              </div>
+              <p className="text-center text-[11px] uppercase tracking-widest text-muted-foreground">
+                Sampling interval fixed at {VIDEO_STEP.toFixed(1)}s · automatic reconfirmation pass included
+              </p>
 
               {videoBusy && (
                 <div className="max-w-md mx-auto space-y-2">
@@ -1043,7 +945,9 @@ function Index() {
                   const matricUpper = r.matric.toUpperCase();
                   const matricValid = !!matricUpper && matricRegex.test(matricUpper);
                   const parsed = parseScore(r.score);
-                  const scoreValid = parsed.ok;
+                  const capNum = maxScore.trim() && Number.isFinite(Number(maxScore)) ? Number(maxScore) : null;
+                  const overCap = parsed.ok && parsed.score != null && capNum != null && parsed.score > capNum;
+                  const scoreValid = parsed.ok && !overCap;
                   const isDup = matricUpper && (matricCounts.get(matricUpper) ?? 0) > 1;
                   const incomplete = r.status !== "scanning" && r.status !== "queued" && (!matricValid || !scoreValid);
                   return (
@@ -1128,6 +1032,9 @@ function Index() {
                             />
                             {r.score && !parsed.ok && (
                               <p className="text-[11px] text-destructive mt-1">Invalid: {parsed.reason}</p>
+                            )}
+                            {r.score && parsed.ok && overCap && (
+                              <p className="text-[11px] text-destructive mt-1">Above the {maxScore.trim()} maximum</p>
                             )}
                           </div>
                           <Button size="sm" onClick={() => saveEdited(r)}>Save</Button>
