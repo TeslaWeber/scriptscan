@@ -945,7 +945,9 @@ function Index() {
                   const matricUpper = r.matric.toUpperCase();
                   const matricValid = !!matricUpper && matricRegex.test(matricUpper);
                   const parsed = parseScore(r.score);
-                  const scoreValid = parsed.ok;
+                  const capNum = maxScore.trim() && Number.isFinite(Number(maxScore)) ? Number(maxScore) : null;
+                  const overCap = parsed.ok && parsed.score != null && capNum != null && parsed.score > capNum;
+                  const scoreValid = parsed.ok && !overCap;
                   const isDup = matricUpper && (matricCounts.get(matricUpper) ?? 0) > 1;
                   const incomplete = r.status !== "scanning" && r.status !== "queued" && (!matricValid || !scoreValid);
                   return (
