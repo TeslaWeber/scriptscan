@@ -688,7 +688,6 @@ function Index() {
       // Fresh slate — this batch is closed.
       setRecords([]);
       fileMap.current.clear();
-      seenMatrics.current = new Set();
       setTranscript("");
       setProgress(0);
       setCourse("");
@@ -719,90 +718,6 @@ function Index() {
   return (
     <div className="min-h-screen">
       <Toaster richColors position="top-center" />
-
-      {liveOn && (
-        <div className="fixed inset-0 z-50 bg-black">
-          <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />
-
-          {/* OCR bounding-box preview */}
-          {(boxes.matric || boxes.score) && (
-            <div className="pointer-events-none absolute inset-0">
-              {boxes.matric && boxes.matric.length === 4 && (
-                <div
-                  className="absolute border-2 border-[color:var(--color-brass)]"
-                  style={{ left: `${boxes.matric[0] * 100}%`, top: `${boxes.matric[1] * 100}%`, width: `${boxes.matric[2] * 100}%`, height: `${boxes.matric[3] * 100}%` }}
-                >
-                  <span className="absolute -top-5 left-0 text-[10px] uppercase tracking-widest bg-[color:var(--color-brass)] text-black px-1">Matric</span>
-                </div>
-              )}
-              {boxes.score && boxes.score.length === 4 && (
-                <div
-                  className="absolute border-2 border-emerald-400"
-                  style={{ left: `${boxes.score[0] * 100}%`, top: `${boxes.score[1] * 100}%`, width: `${boxes.score[2] * 100}%`, height: `${boxes.score[3] * 100}%` }}
-                >
-                  <span className="absolute -top-5 left-0 text-[10px] uppercase tracking-widest bg-emerald-400 text-black px-1">Score</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* guide frame */}
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
-            <div className="w-full max-w-xl aspect-[4/3] rounded-sm border-2 border-[color:var(--color-brass)]/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
-          </div>
-
-          <div className="absolute top-0 inset-x-0 flex items-center justify-between gap-2 p-4 text-white">
-            <div className="min-w-0">
-              <p className="font-display text-lg leading-tight">{course}</p>
-              <p className="text-xs opacity-80 truncate">{liveHint || "Searching for a script…"}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="rounded-sm">{liveCaptured} captured</Badge>
-              <Button size="icon" variant="ghost" onClick={stopLive} className="text-white hover:bg-white/15" title="Close">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="absolute bottom-24 inset-x-0 px-6 flex flex-col items-center gap-2 text-white">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest">
-              <button type="button" onClick={() => setSpeedMode("fast")} className={`px-2 py-1 rounded-sm border ${speedMode === "fast" ? "bg-white/20 border-white" : "border-white/40"}`}>Fast</button>
-              <button type="button" onClick={() => setSpeedMode("standard")} className={`px-2 py-1 rounded-sm border ${speedMode === "standard" ? "bg-white/20 border-white" : "border-white/40"}`}>Standard</button>
-              <span className="opacity-80">{captureInterval} ms</span>
-            </div>
-            <input
-              type="range" min={300} max={3000} step={100} value={captureInterval}
-              onChange={(e) => setCaptureInterval(Number(e.target.value))}
-              className="w-56 accent-[color:var(--color-brass)]"
-              aria-label="Capture interval"
-            />
-          </div>
-
-          <div className="absolute bottom-0 inset-x-0 p-5 pb-8 flex items-center justify-center gap-4">
-            {torchSupported && (
-              <Button size="icon" variant="ghost" onClick={toggleTorch} className="h-12 w-12 rounded-full text-white hover:bg-white/15" title="Flashlight">
-                {torchOn ? <Zap className="h-6 w-6 text-[color:var(--color-brass)]" /> : <ZapOff className="h-6 w-6" />}
-              </Button>
-            )}
-            <Button
-              onClick={grabFrame}
-              className="h-16 w-16 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 p-0"
-              title="Capture now"
-            >
-              <Camera className="h-6 w-6 text-white" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setAutoCapture((a) => !a)}
-              className="h-12 w-12 rounded-full text-white hover:bg-white/15"
-              title={autoCapture ? "Pause auto-detect" : "Resume auto-detect"}
-            >
-              {autoCapture ? <Square className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-            </Button>
-          </div>
-        </div>
-      )}
 
       <AlertDialog open={confirmExport} onOpenChange={setConfirmExport}>
         <AlertDialogContent>
