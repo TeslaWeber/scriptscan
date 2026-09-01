@@ -797,7 +797,6 @@ function Index() {
         <Tabs defaultValue="upload">
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" />Photographs</TabsTrigger>
-            <TabsTrigger value="live" className="gap-2"><Video className="h-4 w-4" />Live scan</TabsTrigger>
             <TabsTrigger value="video" className="gap-2"><Film className="h-4 w-4" />Video sweep</TabsTrigger>
             <TabsTrigger value="voice" className="gap-2"><Mic className="h-4 w-4" />Dictation</TabsTrigger>
           </TabsList>
@@ -827,21 +826,6 @@ function Index() {
                     </p>
                   </div>
                 )}
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="live">
-            <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
-              <div className="text-center space-y-1">
-                <h2 className="font-display text-2xl">Live camera sweep</h2>
-                <p className="text-sm text-muted-foreground max-w-xl mx-auto">
-                  Opens a full-screen camera. Frames are read continuously and a capture is only filed when a matric number
-                  matching <span className="font-mono">{pattern}</span> is detected together with a score.
-                </p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button onClick={startLive} size="lg" className="gap-2"><Play className="h-4 w-4" /> Start live scan</Button>
               </div>
             </Card>
           </TabsContent>
