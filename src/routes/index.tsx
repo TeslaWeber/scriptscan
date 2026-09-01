@@ -1033,6 +1033,9 @@ function Index() {
                             {r.score && !parsed.ok && (
                               <p className="text-[11px] text-destructive mt-1">Invalid: {parsed.reason}</p>
                             )}
+                            {r.score && parsed.ok && overCap && (
+                              <p className="text-[11px] text-destructive mt-1">Above the {maxScore.trim()} maximum</p>
+                            )}
                           </div>
                           <Button size="sm" onClick={() => saveEdited(r)}>Save</Button>
                           <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)} title={r.dbId ? "Delete permanently" : "Remove"}>
