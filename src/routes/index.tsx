@@ -120,7 +120,22 @@ function Index() {
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoStage, setVideoStage] = useState("");
   const [videoFound, setVideoFound] = useState(0);
-  const VIDEO_STEP = 1.0;
+  const VIDEO_STEP = 0.6;
+  const VIDEO_RECHECK_STEP = 0.25;
+  const videoStart = useRef(0);
+  const [videoEta, setVideoEta] = useState("");
+  const reportVideo = useCallback((pct: number, stage: string) => {
+    const clamped = Math.min(100, Math.max(0, Math.round(pct)));
+    setVideoProgress(clamped);
+    setVideoStage(stage);
+    const elapsed = (Date.now() - videoStart.current) / 1000;
+    if (clamped >= 4 && clamped < 100 && elapsed > 1) {
+      const remaining = Math.max(0, Math.round((elapsed / clamped) * (100 - clamped)));
+      setVideoEta(remaining >= 60 ? `~${Math.floor(remaining / 60)}m ${remaining % 60}s left` : `~${remaining}s left`);
+    } else {
+      setVideoEta("");
+    }
+  }, []);
   const [maxScore, setMaxScore] = useState("");
 
   // ---- voice state
@@ -336,8 +351,8 @@ function Index() {
     if (!course.trim()) { toast.error("Enter a course code first"); return; }
     videoAbort.current = { aborted: false };
     setVideoBusy(true);
-    setVideoProgress(0);
-    setVideoStage("Reading video…");
+    videoStart.current = Date.now();
+    reportVideo(0, "Reading video…");
     setVideoFound(0);
 
     const capTotal = maxScore.trim() && Number.isFinite(Number(maxScore)) ? Number(maxScore) : null;
@@ -453,10 +468,7 @@ function Index() {
       // ---- Pass 1: standard sweep at a fixed 1.0s sampling interval
       const frames = await extractVideoFrames(file, {
         step: VIDEO_STEP,
-        onProgress: (pct) => {
-          setVideoProgress(Math.round(pct * 0.25));
-          setVideoStage(`Sweeping footage… ${pct}%`);
-        },
+        onProgress: (pct) => reportVideo(pct * 0.25, `Sweeping footage… ${pct}%`),
         signal: videoAbort.current,
       });
 
@@ -465,7 +477,7 @@ function Index() {
 
       setVideoStage(`Reading ${frames.length} frame(s)…`);
       await readFrames(frames, (done) =>
-        setVideoProgress(25 + Math.round((done / frames.length) * 40)),
+        reportVideo(25 + (done / frames.length) * 40, `Reading frame ${done} of ${frames.length}…`),
       );
 
       // ---- Pass 2: automatic reconfirmation — finer, more sensitive sweep so no
@@ -473,18 +485,15 @@ function Index() {
       if (!videoAbort.current.aborted) {
         setVideoStage("Reconfirming — second pass over the footage…");
         const recheck = await extractVideoFrames(file, {
-          step: 0.35,
-          diffThreshold: 3,
+          step: VIDEO_RECHECK_STEP,
+          diffThreshold: 2,
           minSharpness: 2,
-          onProgress: (pct) => {
-            setVideoProgress(65 + Math.round(pct * 0.1));
-            setVideoStage(`Reconfirming footage… ${pct}%`);
-          },
+          onProgress: (pct) => reportVideo(65 + pct * 0.1, `Reconfirming footage… ${pct}%`),
           signal: videoAbort.current,
         });
         setVideoStage(`Reconfirming ${recheck.length} frame(s)…`);
         await readFrames(recheck, (done) =>
-          setVideoProgress(75 + Math.round((done / Math.max(1, recheck.length)) * 25)),
+          reportVideo(75 + (done / Math.max(1, recheck.length)) * 25, `Reconfirming frame ${done} of ${recheck.length}…`),
         );
       }
 
@@ -500,7 +509,7 @@ function Index() {
         applyPersistResult(det.recId, await persistRecord(rec));
       }
 
-      setVideoProgress(100);
+      reportVideo(100, "Complete");
       toast.success("Video sweep complete", {
         description: `${dets.size} matric number(s) confirmed after two passes`,
       });
@@ -510,8 +519,9 @@ function Index() {
     } finally {
       setVideoBusy(false);
       setVideoStage("");
+      setVideoEta("");
     }
-  }, [course, user, matricRegex, refreshReviewCount, maxScore]);
+  }, [course, user, matricRegex, refreshReviewCount, maxScore, reportVideo]);
 
   // ================= VOICE CAPTURE =================
   const startRecording = async () => {
@@ -875,14 +885,18 @@ function Index() {
               </div>
 
               <p className="text-center text-[11px] uppercase tracking-widest text-muted-foreground">
-                Sampling interval fixed at {VIDEO_STEP.toFixed(1)}s · automatic reconfirmation pass included
+                Fine {VIDEO_STEP.toFixed(1)}s sampling · extra-fine {VIDEO_RECHECK_STEP}s reconfirmation pass · maximum digit precision
               </p>
 
               {videoBusy && (
                 <div className="max-w-md mx-auto space-y-2">
-                  <Progress value={videoProgress} />
+                  <div className="flex items-center gap-3">
+                    <Progress value={videoProgress} className="flex-1" />
+                    <span className="text-sm font-semibold tabular-nums w-24 text-right">{videoProgress}%</span>
+                  </div>
                   <p className="text-xs text-muted-foreground flex items-center gap-2 justify-center text-center">
                     <Loader2 className="h-3 w-3 animate-spin" /> {videoStage} · {videoFound} record(s) filed
+                    {videoEta && <span className="font-medium text-foreground">· {videoEta}</span>}
                   </p>
                 </div>
               )}

@@ -17,7 +17,9 @@ From the script image, extract:
 2. The lecturer's SCORE, written as "score/total" — usually circled, boxed, or highlighted in red/blue ink at the top corner. Examples: "45/60", "12/20", "78/100".
 
 Also report the bounding box of each detected value as [x, y, width, height] using fractions of the image width/height (0..1).
-If a value is unreadable or missing, return null for it. Be tolerant of handwriting, ink color, and orientation.`;
+If a value is unreadable or missing, return null for it. Be tolerant of handwriting, ink color, and orientation.
+
+CRITICAL — read every digit of the matric number and score character by character with absolute precision. Handwritten digits are frequently confused: 4 vs 6 vs 9 vs 0, 1 vs 7, 3 vs 5 vs 8. Examine each glyph's shape carefully before deciding. Never guess a digit from context or pattern; only report what is actually written. If you are torn between two digits for a character, prefer the reading where the handwriting stroke is clearest, and lower your confidence accordingly.`;
 
     const tools = [
       {
