@@ -53,37 +53,53 @@ CRITICAL — read every digit of the matric number and score character by charac
       },
     ];
 
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Extract matric number and score from this marked exam script." },
-              { type: "image_url", image_url: { url: `data:${data.mimeType};base64,${data.imageBase64}` } },
-            ],
-          },
-        ],
-        tools,
-        tool_choice: { type: "function", function: { name: "report_extraction" } },
-      }),
+    const body = JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Extract matric number and score from this marked exam script." },
+            { type: "image_url", image_url: { url: `data:${data.mimeType};base64,${data.imageBase64}` } },
+          ],
+        },
+      ],
+      tools,
+      tool_choice: { type: "function", function: { name: "report_extraction" } },
     });
 
-    if (!resp.ok) {
-      if (resp.status === 429) throw new Error("Rate limit exceeded. Please wait and try again.");
-      if (resp.status === 402) throw new Error("AI credits exhausted. Add credits in Settings → Workspace → Usage.");
-      const t = await resp.text();
-      console.error("AI gateway error:", resp.status, t);
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const MAX_ATTEMPTS = 5;
+    let resp: Response | null = null;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body,
+      });
+      if (resp.status !== 429) break;
+      if (attempt === MAX_ATTEMPTS - 1) break;
+      const retryAfter = Number(resp.headers.get("retry-after"));
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+        ? retryAfter * 1000
+        : Math.min(8000, 800 * 2 ** attempt) + Math.floor(Math.random() * 400);
+      await sleep(waitMs);
+    }
+
+    if (!resp || !resp.ok) {
+      if (resp?.status === 429) throw new Error("The scanner is busy (rate limited). Please wait a few seconds and try again.");
+      if (resp?.status === 402) throw new Error("AI credits exhausted. Add credits in Settings → Workspace → Usage.");
+      const t = resp ? await resp.text() : "no response";
+      console.error("AI gateway error:", resp?.status, t);
       throw new Error("OCR service error");
     }
 
     const json = await resp.json();
     const call = json?.choices?.[0]?.message?.tool_calls?.[0];
     if (!call) throw new Error("No extraction returned");
+
     const args = JSON.parse(call.function.arguments);
     return args as {
       matric_no: string | null;

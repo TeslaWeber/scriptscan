@@ -111,7 +111,7 @@ function Index() {
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileMap = useRef<Map<string, File>>(new Map());
-  const CONCURRENCY = 4;
+  const CONCURRENCY = 2;
 
   // ---- video sweep state
   const videoInputRef = useRef<HTMLInputElement>(null);
