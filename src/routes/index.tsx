@@ -519,8 +519,9 @@ function Index() {
     } finally {
       setVideoBusy(false);
       setVideoStage("");
+      setVideoEta("");
     }
-  }, [course, user, matricRegex, refreshReviewCount, maxScore]);
+  }, [course, user, matricRegex, refreshReviewCount, maxScore, reportVideo]);
 
   // ================= VOICE CAPTURE =================
   const startRecording = async () => {
@@ -884,14 +885,18 @@ function Index() {
               </div>
 
               <p className="text-center text-[11px] uppercase tracking-widest text-muted-foreground">
-                Sampling interval fixed at {VIDEO_STEP.toFixed(1)}s · automatic reconfirmation pass included
+                Fine {VIDEO_STEP.toFixed(1)}s sampling · extra-fine {VIDEO_RECHECK_STEP}s reconfirmation pass · maximum digit precision
               </p>
 
               {videoBusy && (
                 <div className="max-w-md mx-auto space-y-2">
-                  <Progress value={videoProgress} />
+                  <div className="flex items-center gap-3">
+                    <Progress value={videoProgress} className="flex-1" />
+                    <span className="text-sm font-semibold tabular-nums w-24 text-right">{videoProgress}%</span>
+                  </div>
                   <p className="text-xs text-muted-foreground flex items-center gap-2 justify-center text-center">
                     <Loader2 className="h-3 w-3 animate-spin" /> {videoStage} · {videoFound} record(s) filed
+                    {videoEta && <span className="font-medium text-foreground">· {videoEta}</span>}
                   </p>
                 </div>
               )}
