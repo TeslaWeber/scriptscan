@@ -120,7 +120,22 @@ function Index() {
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoStage, setVideoStage] = useState("");
   const [videoFound, setVideoFound] = useState(0);
-  const VIDEO_STEP = 1.0;
+  const VIDEO_STEP = 0.6;
+  const VIDEO_RECHECK_STEP = 0.25;
+  const videoStart = useRef(0);
+  const [videoEta, setVideoEta] = useState("");
+  const reportVideo = useCallback((pct: number, stage: string) => {
+    const clamped = Math.min(100, Math.max(0, Math.round(pct)));
+    setVideoProgress(clamped);
+    setVideoStage(stage);
+    const elapsed = (Date.now() - videoStart.current) / 1000;
+    if (clamped >= 4 && clamped < 100 && elapsed > 1) {
+      const remaining = Math.max(0, Math.round((elapsed / clamped) * (100 - clamped)));
+      setVideoEta(remaining >= 60 ? `~${Math.floor(remaining / 60)}m ${remaining % 60}s left` : `~${remaining}s left`);
+    } else {
+      setVideoEta("");
+    }
+  }, []);
   const [maxScore, setMaxScore] = useState("");
 
   // ---- voice state
