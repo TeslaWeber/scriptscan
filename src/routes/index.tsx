@@ -351,8 +351,8 @@ function Index() {
     if (!course.trim()) { toast.error("Enter a course code first"); return; }
     videoAbort.current = { aborted: false };
     setVideoBusy(true);
-    setVideoProgress(0);
-    setVideoStage("Reading video…");
+    videoStart.current = Date.now();
+    reportVideo(0, "Reading video…");
     setVideoFound(0);
 
     const capTotal = maxScore.trim() && Number.isFinite(Number(maxScore)) ? Number(maxScore) : null;
@@ -468,10 +468,7 @@ function Index() {
       // ---- Pass 1: standard sweep at a fixed 1.0s sampling interval
       const frames = await extractVideoFrames(file, {
         step: VIDEO_STEP,
-        onProgress: (pct) => {
-          setVideoProgress(Math.round(pct * 0.25));
-          setVideoStage(`Sweeping footage… ${pct}%`);
-        },
+        onProgress: (pct) => reportVideo(pct * 0.25, `Sweeping footage… ${pct}%`),
         signal: videoAbort.current,
       });
 
@@ -480,7 +477,7 @@ function Index() {
 
       setVideoStage(`Reading ${frames.length} frame(s)…`);
       await readFrames(frames, (done) =>
-        setVideoProgress(25 + Math.round((done / frames.length) * 40)),
+        reportVideo(25 + (done / frames.length) * 40, `Reading frame ${done} of ${frames.length}…`),
       );
 
       // ---- Pass 2: automatic reconfirmation — finer, more sensitive sweep so no
@@ -488,18 +485,15 @@ function Index() {
       if (!videoAbort.current.aborted) {
         setVideoStage("Reconfirming — second pass over the footage…");
         const recheck = await extractVideoFrames(file, {
-          step: 0.35,
-          diffThreshold: 3,
+          step: VIDEO_RECHECK_STEP,
+          diffThreshold: 2,
           minSharpness: 2,
-          onProgress: (pct) => {
-            setVideoProgress(65 + Math.round(pct * 0.1));
-            setVideoStage(`Reconfirming footage… ${pct}%`);
-          },
+          onProgress: (pct) => reportVideo(65 + pct * 0.1, `Reconfirming footage… ${pct}%`),
           signal: videoAbort.current,
         });
         setVideoStage(`Reconfirming ${recheck.length} frame(s)…`);
         await readFrames(recheck, (done) =>
-          setVideoProgress(75 + Math.round((done / Math.max(1, recheck.length)) * 25)),
+          reportVideo(75 + (done / Math.max(1, recheck.length)) * 25, `Reconfirming frame ${done} of ${recheck.length}…`),
         );
       }
 
@@ -515,7 +509,7 @@ function Index() {
         applyPersistResult(det.recId, await persistRecord(rec));
       }
 
-      setVideoProgress(100);
+      reportVideo(100, "Complete");
       toast.success("Video sweep complete", {
         description: `${dets.size} matric number(s) confirmed after two passes`,
       });
