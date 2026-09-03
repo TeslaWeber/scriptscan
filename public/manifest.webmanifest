@@ -1,0 +1,34 @@
+{
+  "name": "ScriptScan — Digitize Marked Exam Scripts",
+  "short_name": "ScriptScan",
+  "description": "Scan marked exam scripts, auto-extract matric numbers and scores, and export a clean .xlsx file.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "minimal-ui",
+  "display_override": ["minimal-ui", "browser"],
+  "orientation": "portrait",
+  "background_color": "#1e293b",
+  "theme_color": "#1e293b",
+  "categories": ["education", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
