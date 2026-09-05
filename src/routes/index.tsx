@@ -252,7 +252,7 @@ function Index() {
           user_id: user.id, course: course.trim(), matric, score: scoreNum, total: totalNum,
           confidence: r.confidence ?? null, notes: r.notes ?? null, status,
           file_name: r.fileName, error: r.error ?? null,
-        }, { onConflict: "course,matric" }).select().single();
+        }, { onConflict: "user_id,course,matric" }).select().single();
       if (error) return { ok: false, msg: error.message };
       return { ok: !needsReview, msg: needsReview ? "Saved (needs review)" : undefined, dbId: data.id };
     }
