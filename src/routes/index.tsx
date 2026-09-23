@@ -709,25 +709,48 @@ function Index() {
 
   const signOut = async () => { await supabase.auth.signOut(); navigate({ to: "/auth" }); };
 
-  if (!authChecked || (user && !roleChecked)) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  if (!authChecked || (user && !roleChecked))
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   if (!user) return null;
   if (!isStaff) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <Card className="p-6 max-w-md text-center space-y-3">
-          <AlertTriangle className="h-10 w-10 mx-auto text-[color:var(--color-warning)]" />
-          <h2 className="font-semibold">Access pending</h2>
-          <p className="text-sm text-muted-foreground">Your account does not yet have staff access. Contact your administrator.</p>
-          <Button onClick={signOut} variant="outline">Sign out</Button>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="panel max-w-md px-6 py-6 text-center">
+          <AlertTriangle className="mx-auto h-8 w-8 text-[color:var(--color-warning)]" />
+          <h2 className="mt-3 text-[18px] font-semibold">Access pending</h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            This account does not yet have examination officer access. Contact your administrator.
+          </p>
+          <Button onClick={signOut} variant="outline" className="mt-4 h-10">Sign out</Button>
+        </div>
       </div>
     );
   }
 
   const savedCount = records.filter((r) => r.status === "saved").length;
+  const tabTrigger =
+    "flex-1 gap-2 rounded-[6px] text-[13px] font-medium data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-none sm:flex-none sm:px-4";
 
   return (
-    <div className="min-h-screen">
+    <AppShell
+      title="Examination Capture"
+      description="Digitise marked scripts by photograph, recorded video sweep or dictation, then issue a verified result workbook."
+      session={course.trim() ? `${course.trim()} · ${records.length} script(s) in register` : undefined}
+      actions={
+        <Button
+          onClick={() => setConfirmExport(true)}
+          disabled={!course.trim() || exportingScores}
+          className="h-10 gap-2"
+        >
+          {exportingScores ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+          Export Scores .xlsx
+        </Button>
+      }
+    >
       <Toaster richColors position="top-center" />
 
       <AlertDialog open={confirmExport} onOpenChange={setConfirmExport}>
@@ -735,8 +758,8 @@ function Index() {
           <AlertDialogHeader>
             <AlertDialogTitle>Export and clear this page?</AlertDialogTitle>
             <AlertDialogDescription>
-              A new numbered version of <strong>{course}</strong> will be saved to the history file and downloaded.
-              The entry register on this page will then be cleared so the next batch starts fresh. This cannot be undone.
+              A new numbered version of <strong>{course}</strong> will be saved to the examination record and downloaded.
+              The capture register on this page will then be cleared so the next examination starts fresh. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -746,199 +769,157 @@ function Index() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <header className="border-b-2 border-primary/80 bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-11 w-11 rounded-sm border border-[color:var(--color-brass)]/70 flex items-center justify-center flex-shrink-0">
-              <GraduationCap className="h-6 w-6 text-[color:var(--color-brass)]" />
+      <div className="grid gap-6">
+        {/* Step 1 — examination details */}
+        <Panel
+          title="1. Examination details"
+          description="Recorded against every script captured in this session."
+          actions={
+            course.trim() && reviewCount !== null ? (
+              reviewCount > 0
+                ? <StatusPill tone="warning">{reviewCount} incomplete entr{reviewCount === 1 ? "y" : "ies"}</StatusPill>
+                : <StatusPill tone="success">All entries complete</StatusPill>
+            ) : null
+          }
+        >
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="course" className="field-label">Course code *</Label>
+              <Input id="course" className="h-10" placeholder="e.g. CSC 301" value={course} onChange={(e) => setCourse(e.target.value)} />
+              <p className="text-[12px] text-muted-foreground">Required before scripts can be filed.</p>
             </div>
-            <div className="min-w-0">
-              <p className="font-display text-xl leading-tight tracking-tight">ScriptScan</p>
-              <p className="text-[11px] uppercase tracking-[0.22em] opacity-70 truncate">Office of Examinations · {user.email}</p>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pattern" className="field-label">Matric number sample</Label>
+              <Input id="pattern" className="h-10 font-mono" value={pattern} onChange={(e) => setPattern(e.target.value)} placeholder={DEFAULT_MATRIC_SAMPLE} />
+              <p className="text-[12px] text-muted-foreground">{describePattern(pattern)}</p>
             </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <Link to="/history">
-              <Button variant="ghost" size="sm" className="gap-1 text-primary-foreground hover:bg-primary-foreground/10">
-                <Archive className="h-4 w-4" /><span className="hidden sm:inline">History file</span>
-              </Button>
-            </Link>
-            <Button onClick={signOut} variant="ghost" size="sm" className="gap-1 text-primary-foreground hover:bg-primary-foreground/10">
-              <LogOut className="h-4 w-4" /><span className="hidden sm:inline">Sign out</span>
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-8 space-y-8">
-        <section>
-          <h1 className="font-display text-3xl sm:text-4xl">Examination Capture Console</h1>
-          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Digitize marked scripts through photographs, a recorded video sweep, or spoken dictation — then compile a clean
-            <span className="font-medium text-foreground"> MATRIC NO. / SCORE </span> spreadsheet.
-          </p>
-        </section>
-
-        <Card className="p-5 border-t-4 border-t-[color:var(--color-brass)]" style={{ boxShadow: "var(--shadow-card)" }}>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="course" className="text-xs uppercase tracking-widest text-muted-foreground">Course code *</Label>
-              <Input id="course" placeholder="e.g. CSC 301" value={course} onChange={(e) => setCourse(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="pattern" className="text-xs uppercase tracking-widest text-muted-foreground">Matric pattern (sample)</Label>
-              <Input id="pattern" value={pattern} onChange={(e) => setPattern(e.target.value)} className="font-mono" placeholder={DEFAULT_MATRIC_SAMPLE} />
-              <p className="text-[11px] text-muted-foreground">{describePattern(pattern)}</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="maxscore" className="text-xs uppercase tracking-widest text-muted-foreground">Graded over (total)</Label>
-              <Input
-                id="maxscore"
-                value={maxScore}
-                onChange={(e) => setMaxScore(e.target.value)}
-                inputMode="numeric"
-                className="font-mono"
-                placeholder="e.g. 60"
-              />
-              <p className="text-[11px] text-muted-foreground">
-                {maxScore.trim() ? `Scores checked against a maximum of ${maxScore.trim()}` : "Optional — used to validate detected scores"}
+            <div className="grid gap-1.5">
+              <Label htmlFor="maxscore" className="field-label">Graded over (maximum)</Label>
+              <Input id="maxscore" className="h-10 font-mono" value={maxScore} onChange={(e) => setMaxScore(e.target.value)} inputMode="numeric" placeholder="e.g. 60" />
+              <p className="text-[12px] text-muted-foreground">
+                {maxScore.trim() ? `Scores checked against a maximum of ${maxScore.trim()}.` : "Optional — used to validate detected scores."}
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 items-center mt-5 pt-4 border-t border-border">
-            <Button onClick={() => setConfirmExport(true)} disabled={!course.trim() || exportingScores} className="gap-2">
-              {exportingScores ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-              Export Scores .xlsx
-            </Button>
-            {course.trim() && reviewCount !== null && (
-              <Badge variant={reviewCount > 0 ? "destructive" : "secondary"} className="gap-1 rounded-sm">
-                <AlertTriangle className="h-3 w-3" />
-                {reviewCount} incomplete entr{reviewCount === 1 ? "y" : "ies"}
-              </Badge>
-            )}
-          </div>
-        </Card>
+        </Panel>
 
-        <Tabs defaultValue="upload">
-          <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" />Photographs</TabsTrigger>
-            <TabsTrigger value="video" className="gap-2"><Film className="h-4 w-4" />Video sweep</TabsTrigger>
-            <TabsTrigger value="voice" className="gap-2"><Mic className="h-4 w-4" />Dictation</TabsTrigger>
-          </TabsList>
+        {/* Step 2 — capture method */}
+        <Panel title="2. Capture method" description="All three methods file into the same verification register.">
+          <Tabs defaultValue="upload">
+            <TabsList className="mb-5 h-11 w-full justify-start gap-1 rounded-md bg-muted p-1 sm:w-auto">
+              <TabsTrigger value="upload" className={tabTrigger}><Upload className="h-4 w-4" />Photographs</TabsTrigger>
+              <TabsTrigger value="video" className={tabTrigger}><Film className="h-4 w-4" />Video sweep</TabsTrigger>
+              <TabsTrigger value="voice" className={tabTrigger}><Mic className="h-4 w-4" />Dictation</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="upload">
-            <Card className="p-6" style={{ boxShadow: "var(--shadow-card)" }}>
-              <div className="flex flex-col items-center text-center gap-4">
-                <h2 className="font-display text-2xl">Upload marked scripts</h2>
-                <p className="text-sm text-muted-foreground max-w-lg">
-                  Select any number of photographs. Everything is filed under <strong>{course || "(set course)"}</strong>, and repeated matric numbers are flagged for merge.
+            <TabsContent value="upload" className="mt-0">
+              <div className="rounded-md border border-dashed border-border bg-muted/40 px-5 py-8 text-center">
+                <h3 className="section-title">Upload marked scripts</h3>
+                <p className="mx-auto mt-1.5 max-w-lg text-[14px] text-muted-foreground">
+                  Select any number of photographs. Everything is filed under{" "}
+                  <span className="font-medium text-foreground">{course || "(set course code)"}</span>, and repeated matric
+                  numbers are flagged for merge.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <div className="mt-5 flex flex-col justify-center gap-2.5 sm:flex-row">
                   <input ref={galleryRef} type="file" accept="image/*" multiple hidden onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
                   <input ref={cameraRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
-                  <Button onClick={() => cameraRef.current?.click()} disabled={busy} size="lg" className="gap-2">
+                  <Button onClick={() => cameraRef.current?.click()} disabled={busy} className="h-10 gap-2">
                     <Camera className="h-4 w-4" /> Take photo
                   </Button>
-                  <Button onClick={() => galleryRef.current?.click()} disabled={busy} variant="outline" size="lg" className="gap-2">
+                  <Button onClick={() => galleryRef.current?.click()} disabled={busy} variant="outline" className="h-10 gap-2">
                     <Upload className="h-4 w-4" /> Choose images
                   </Button>
                 </div>
                 {busy && (
-                  <div className="w-full max-w-md space-y-2 pt-2">
-                    <Progress value={progress} />
-                    <p className="text-xs text-muted-foreground flex items-center gap-2 justify-center">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Reading scripts… {progress}%
+                  <div className="mx-auto mt-6 grid max-w-md gap-2">
+                    <div className="flex items-center gap-3">
+                      <Progress value={progress} className="h-1.5 flex-1" />
+                      <span className="w-12 text-right text-[13px] font-semibold tabular-nums">{progress}%</span>
+                    </div>
+                    <p className="flex items-center justify-center gap-2 text-[13px] text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading scripts…
                     </p>
                   </div>
                 )}
               </div>
-            </Card>
-          </TabsContent>
+            </TabsContent>
 
-          <TabsContent value="video">
-            <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
-              <div className="text-center space-y-1">
-                <h2 className="font-display text-2xl">Recorded video sweep</h2>
-                <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+            <TabsContent value="video" className="mt-0">
+              <div className="rounded-md border border-dashed border-border bg-muted/40 px-5 py-8 text-center">
+                <h3 className="section-title">Recorded video sweep</h3>
+                <p className="mx-auto mt-1.5 max-w-xl text-[14px] text-muted-foreground">
                   Upload a video of the scripts being turned over. The footage is walked frame by frame — blurred and
-                  repeated frames are discarded — and every matric number matching <span className="font-mono">{pattern}</span>{" "}
-                  with a score is filed once, automatically.
+                  repeated frames are discarded — and every matric number matching{" "}
+                  <span className="font-mono text-foreground">{pattern}</span> with a score is filed once, automatically.
                 </p>
-              </div>
 
-              <div className="flex flex-wrap justify-center items-center gap-3">
-                <input
-                  ref={videoInputRef}
-                  type="file"
-                  accept="video/*"
-                  hidden
-                  onChange={(e) => { handleVideo(e.target.files?.[0]); e.target.value = ""; }}
-                />
-                <Button onClick={() => videoInputRef.current?.click()} disabled={videoBusy} size="lg" className="gap-2">
-                  <Film className="h-4 w-4" /> Upload video
-                </Button>
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+                  <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={(e) => { handleVideo(e.target.files?.[0]); e.target.value = ""; }} />
+                  <Button onClick={() => videoInputRef.current?.click()} disabled={videoBusy} className="h-10 gap-2">
+                    <Film className="h-4 w-4" /> Upload video
+                  </Button>
+                  {videoBusy && (
+                    <Button variant="outline" className="h-10 gap-2" onClick={() => { videoAbort.current.aborted = true; }}>
+                      <X className="h-4 w-4" /> Stop sweep
+                    </Button>
+                  )}
+                </div>
+
+                <p className="mt-4 text-[12px] text-muted-foreground">
+                  {VIDEO_STEP.toFixed(1)}s primary sampling · {VIDEO_RECHECK_STEP}s reconfirmation pass · maximum digit precision
+                </p>
+
                 {videoBusy && (
-                  <Button variant="outline" size="lg" onClick={() => { videoAbort.current.aborted = true; }} className="gap-2">
-                    <X className="h-4 w-4" /> Stop sweep
-                  </Button>
-                )}
-              </div>
-
-              <p className="text-center text-[11px] uppercase tracking-widest text-muted-foreground">
-                Fine {VIDEO_STEP.toFixed(1)}s sampling · extra-fine {VIDEO_RECHECK_STEP}s reconfirmation pass · maximum digit precision
-              </p>
-
-              {videoBusy && (
-                <div className="max-w-md mx-auto space-y-2">
-                  <div className="flex items-center gap-3">
-                    <Progress value={videoProgress} className="flex-1" />
-                    <span className="text-sm font-semibold tabular-nums w-24 text-right">{videoProgress}%</span>
+                  <div className="mx-auto mt-5 grid max-w-md gap-2">
+                    <div className="flex items-center gap-3">
+                      <Progress value={videoProgress} className="h-1.5 flex-1" />
+                      <span className="w-12 text-right text-[13px] font-semibold tabular-nums">{videoProgress}%</span>
+                    </div>
+                    <p className="flex flex-wrap items-center justify-center gap-2 text-[13px] text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> {videoStage} · {videoFound} record(s) filed
+                      {videoEta && <span className="font-medium text-foreground">· {videoEta}</span>}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-2 justify-center text-center">
-                    <Loader2 className="h-3 w-3 animate-spin" /> {videoStage} · {videoFound} record(s) filed
-                    {videoEta && <span className="font-medium text-foreground">· {videoEta}</span>}
-                  </p>
-                </div>
-              )}
-            </Card>
-          </TabsContent>
+                )}
+              </div>
+            </TabsContent>
 
-
-          <TabsContent value="voice">
-            <Card className="p-6 space-y-4" style={{ boxShadow: "var(--shadow-card)" }}>
-              <div className="text-center space-y-1">
-                <h2 className="font-display text-2xl">Spoken dictation</h2>
-                <p className="text-sm text-muted-foreground max-w-xl mx-auto">
-                  Press record and read out entries one after another — “{DEFAULT_MATRIC_SAMPLE}, score 45” — then press Done. Every entry is filed and added below.
+            <TabsContent value="voice" className="mt-0">
+              <div className="rounded-md border border-dashed border-border bg-muted/40 px-5 py-8 text-center">
+                <h3 className="section-title">Spoken dictation</h3>
+                <p className="mx-auto mt-1.5 max-w-xl text-[14px] text-muted-foreground">
+                  Press record and read out entries one after another — “{DEFAULT_MATRIC_SAMPLE}, score 45” — then press
+                  Done. Every entry is filed and added to the register below.
                 </p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {!recording ? (
-                  <Button onClick={startRecording} disabled={transcribing} size="lg" className="gap-2">
-                    <Mic className="h-4 w-4" /> Start dictation
-                  </Button>
-                ) : (
-                  <Button onClick={stopRecording} size="lg" variant="destructive" className="gap-2">
-                    <Square className="h-4 w-4" /> Done
-                  </Button>
-                )}
-                {recording && <Badge variant="destructive" className="rounded-sm gap-1 self-center">Recording…</Badge>}
-                {transcribing && (
-                  <span className="flex items-center gap-2 text-sm text-muted-foreground self-center">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Interpreting recording…
-                  </span>
-                )}
-              </div>
-              {transcript && (
-                <div className="rounded-sm border border-border bg-secondary/60 p-3 text-xs text-muted-foreground max-w-2xl mx-auto">
-                  <span className="font-semibold uppercase tracking-widest text-[10px]">Transcript</span>
-                  <p className="mt-1 whitespace-pre-wrap">{transcript}</p>
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+                  {!recording ? (
+                    <Button onClick={startRecording} disabled={transcribing} className="h-10 gap-2">
+                      <Mic className="h-4 w-4" /> Start dictation
+                    </Button>
+                  ) : (
+                    <Button onClick={stopRecording} variant="destructive" className="h-10 gap-2">
+                      <Square className="h-4 w-4" /> Done
+                    </Button>
+                  )}
+                  {recording && <StatusPill tone="error">Recording</StatusPill>}
+                  {transcribing && (
+                    <span className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Interpreting recording…
+                    </span>
+                  )}
                 </div>
-              )}
-            </Card>
-          </TabsContent>
-        </Tabs>
+                {transcript && (
+                  <div className="mx-auto mt-5 max-w-2xl rounded-md border border-border bg-card px-3.5 py-3 text-left">
+                    <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">TRANSCRIPT</p>
+                    <p className="mt-1 whitespace-pre-wrap text-[13px] text-muted-foreground">{transcript}</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </Panel>
 
+        {/* Step 3 — verification register */}
         {records.length > 0 && (() => {
           const sorted = [...records].sort((a, b) => (a.matric || "~").toUpperCase().localeCompare((b.matric || "~").toUpperCase()));
           const matricCounts = new Map<string, number>();
@@ -947,14 +928,16 @@ function Index() {
             if (m) matricCounts.set(m, (matricCounts.get(m) ?? 0) + 1);
           });
           return (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <h3 className="font-display text-xl">
-                  Entry register <span className="text-sm text-muted-foreground font-sans">· {records.length} record(s), {savedCount} filed</span>
-                </h3>
-                <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1"><Trash2 className="h-3 w-3" /> Clear list</Button>
-              </div>
-              <div className="grid gap-3">
+            <Panel
+              title="3. Verification register"
+              description={`${records.length} record(s) captured · ${savedCount} filed`}
+              actions={
+                <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={clearAll}>
+                  <Trash2 className="h-4 w-4" /> Clear register
+                </Button>
+              }
+            >
+              <ul className="grid gap-2.5">
                 {sorted.map((r) => {
                   const matricUpper = r.matric.toUpperCase();
                   const matricValid = !!matricUpper && matricRegex.test(matricUpper);
@@ -965,108 +948,120 @@ function Index() {
                   const isDup = matricUpper && (matricCounts.get(matricUpper) ?? 0) > 1;
                   const incomplete = r.status !== "scanning" && r.status !== "queued" && (!matricValid || !scoreValid);
                   return (
-                    <Card
+                    <li
                       key={r.id}
-                      className={`p-3 flex gap-3 items-start ${
+                      className={`flex items-start gap-3 rounded-md border px-3.5 py-3 ${
                         incomplete
-                          ? "border-l-4 border-l-destructive bg-destructive/5"
+                          ? "border-destructive/40 border-l-[3px] border-l-destructive bg-destructive/[0.04]"
                           : isDup || r.status === "pending-merge"
-                            ? "border-l-4 border-l-[color:var(--color-warning)]"
-                            : ""
+                            ? "border-border border-l-[3px] border-l-[color:var(--color-warning)]"
+                            : "border-border"
                       }`}
-                      style={{ boxShadow: "var(--shadow-card)" }}
                     >
                       {r.preview ? (
-                        <a href={r.preview} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                          <img src={r.preview} alt={r.fileName} className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-sm border border-border hover:opacity-80 transition" />
+                        <a href={r.preview} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                          <img
+                            src={r.preview}
+                            alt={`Captured script ${r.fileName}`}
+                            className="h-20 w-20 rounded-md border border-border object-cover transition hover:opacity-85 sm:h-24 sm:w-24"
+                          />
                         </a>
                       ) : (
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-sm border border-border flex items-center justify-center text-[10px] uppercase tracking-widest text-muted-foreground flex-shrink-0">
-                          {r.fileName === "dictated" ? "Voice" : "Filed"}
+                        <div className="grid h-20 w-20 shrink-0 place-items-center rounded-md border border-border text-[11px] font-medium text-muted-foreground sm:h-24 sm:w-24">
+                          {r.fileName === "dictated" ? "Dictation" : "Filed"}
                         </div>
                       )}
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           {incomplete && (
-                            <Badge variant="destructive" className="gap-1 rounded-sm">
-                              <AlertTriangle className="h-3 w-3" />
+                            <StatusPill tone="error">
                               Incomplete — {!matricValid && !scoreValid ? "matric & score" : !matricValid ? "matric" : "score"}
-                            </Badge>
+                            </StatusPill>
                           )}
-                          {r.status === "scanning" && <Badge variant="secondary" className="gap-1 rounded-sm"><Loader2 className="h-3 w-3 animate-spin" />Reading</Badge>}
-                          {r.status === "queued" && <Badge variant="outline" className="rounded-sm">Queued</Badge>}
-                          {r.status === "error" && <Badge variant="destructive" className="gap-1 rounded-sm"><AlertCircle className="h-3 w-3" />Error</Badge>}
-                          {r.status === "saved" && <Badge className="gap-1 rounded-sm bg-[color:var(--color-success)] text-[color:var(--color-success-foreground)]"><CheckCircle2 className="h-3 w-3" />Filed</Badge>}
-                          {r.status === "pending-merge" && <Badge variant="destructive" className="gap-1 rounded-sm"><GitMerge className="h-3 w-3" />Merge needed</Badge>}
-                          {isDup && <Badge variant="outline" className="gap-1 rounded-sm border-[color:var(--color-warning)] text-[color:var(--color-warning)]">Duplicate ({matricCounts.get(matricUpper)})</Badge>}
-                          {r.confidence && <Badge variant="outline" className="text-xs rounded-sm">conf: {r.confidence}</Badge>}
-                          <span className="text-xs text-muted-foreground truncate">{r.fileName}</span>
+                          {r.status === "scanning" && <StatusPill tone="info"><Loader2 className="h-3 w-3 animate-spin" />Reading</StatusPill>}
+                          {r.status === "queued" && <StatusPill tone="neutral">Queued</StatusPill>}
+                          {r.status === "error" && <StatusPill tone="error"><AlertCircle className="h-3 w-3" />Error</StatusPill>}
+                          {r.status === "saved" && <StatusPill tone="success"><CheckCircle2 className="h-3 w-3" />Filed</StatusPill>}
+                          {r.status === "pending-merge" && <StatusPill tone="warning"><GitMerge className="h-3 w-3" />Merge required</StatusPill>}
+                          {isDup && <StatusPill tone="warning">Duplicate ({matricCounts.get(matricUpper)})</StatusPill>}
+                          {r.confidence && <StatusPill tone="neutral">Confidence: {r.confidence}</StatusPill>}
+                          <span className="truncate text-[12px] text-muted-foreground">{r.fileName}</span>
                         </div>
 
                         {r.status === "pending-merge" && r.pendingMerge && (
-                          <div className="rounded-sm border border-[color:var(--color-warning)]/40 bg-[color:var(--color-warning)]/10 p-2 text-xs space-y-2">
+                          <div className="mt-2.5 rounded-md border border-[color:var(--color-warning)]/35 bg-[color:var(--color-warning)]/[0.08] px-3 py-2.5 text-[13px]">
                             <p>
-                              A filed row already exists for <strong>{matricUpper}</strong> in <strong>{course}</strong>.
-                              {" "}Existing score: <strong>{r.pendingMerge.existingScore ?? "—"}{r.pendingMerge.existingTotal != null ? `/${r.pendingMerge.existingTotal}` : ""}</strong>
-                              {r.pendingMerge.existingConfidence ? ` (conf: ${r.pendingMerge.existingConfidence})` : ""}.
-                              {" "}This capture would write: <strong>{parsed.score ?? "—"}{parsed.total != null ? `/${parsed.total}` : ""}</strong>.
+                              A filed record already exists for <strong>{matricUpper}</strong> in <strong>{course}</strong>.
+                              {" "}Existing score:{" "}
+                              <strong>{r.pendingMerge.existingScore ?? "—"}{r.pendingMerge.existingTotal != null ? `/${r.pendingMerge.existingTotal}` : ""}</strong>
+                              {r.pendingMerge.existingConfidence ? ` (confidence: ${r.pendingMerge.existingConfidence})` : ""}.
+                              {" "}This capture would write:{" "}
+                              <strong>{parsed.score ?? "—"}{parsed.total != null ? `/${parsed.total}` : ""}</strong>.
                             </p>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="destructive" onClick={() => confirmMerge(r)} className="gap-1">
-                                <GitMerge className="h-3 w-3" /> Overwrite filed row
+                            <div className="mt-2.5 flex flex-wrap gap-2">
+                              <Button size="sm" variant="destructive" className="h-9 gap-1.5" onClick={() => confirmMerge(r)}>
+                                <GitMerge className="h-4 w-4" /> Overwrite filed record
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => keepExisting(r)}>Keep existing</Button>
+                              <Button size="sm" variant="outline" className="h-9" onClick={() => keepExisting(r)}>Keep existing</Button>
                             </div>
                           </div>
                         )}
 
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px_auto_auto] gap-2 items-end">
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Matric No.</Label>
+                        <div className="mt-3 grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto_auto]">
+                          <div className="grid gap-1.5">
+                            <Label className="field-label" htmlFor={`matric-${r.id}`}>Matric No.</Label>
                             <Input
+                              id={`matric-${r.id}`}
                               value={r.matric}
                               onChange={(e) => updateRecord(r.id, { matric: e.target.value.toUpperCase() })}
                               onBlur={() => saveEdited({ ...r, matric: r.matric.toUpperCase() })}
-                              className={`font-mono ${r.matric && !matricValid ? "border-destructive" : ""}`}
-                              placeholder="—"
+                              className={`h-10 font-mono ${r.matric && !matricValid ? "border-destructive" : ""}`}
+                              placeholder="Not detected"
                             />
                             {r.matric && !matricValid && (
-                              <p className="text-[11px] text-destructive mt-1">Doesn't match the {pattern} pattern</p>
+                              <p className="text-[12px] text-destructive">Does not match the {pattern} pattern</p>
                             )}
                           </div>
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Score</Label>
+                          <div className="grid gap-1.5">
+                            <Label className="field-label" htmlFor={`score-${r.id}`}>Score</Label>
                             <Input
+                              id={`score-${r.id}`}
                               value={r.score}
                               onChange={(e) => updateRecord(r.id, { score: e.target.value })}
                               onBlur={() => saveEdited(r)}
                               inputMode="decimal"
-                              className={`font-mono ${r.score && !scoreValid ? "border-destructive" : ""}`}
-                              placeholder="e.g. 45 or 45/60"
+                              className={`h-10 font-mono ${r.score && !scoreValid ? "border-destructive" : ""}`}
+                              placeholder="45 or 45/60"
                             />
-                            {r.score && !parsed.ok && (
-                              <p className="text-[11px] text-destructive mt-1">Invalid: {parsed.reason}</p>
-                            )}
+                            {r.score && !parsed.ok && <p className="text-[12px] text-destructive">Invalid: {parsed.reason}</p>}
                             {r.score && parsed.ok && overCap && (
-                              <p className="text-[11px] text-destructive mt-1">Above the {maxScore.trim()} maximum</p>
+                              <p className="text-[12px] text-destructive">Above the {maxScore.trim()} maximum</p>
                             )}
                           </div>
-                          <Button size="sm" onClick={() => saveEdited(r)}>Save</Button>
-                          <Button variant="ghost" size="icon" onClick={() => removeRecord(r.id)} title={r.dbId ? "Delete permanently" : "Remove"}>
+                          <Button className="h-10" onClick={() => saveEdited(r)}>Save</Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-10 w-10 text-destructive"
+                            onClick={() => removeRecord(r.id)}
+                            aria-label={r.dbId ? "Delete record permanently" : "Remove record"}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        {r.error && <p className="text-xs text-destructive">{r.error}</p>}
-                        {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
+                        {r.error && <p className="mt-2 text-[13px] text-destructive">{r.error}</p>}
+                        {r.notes && <p className="mt-1 text-[13px] text-muted-foreground">{r.notes}</p>}
                       </div>
-                    </Card>
+                    </li>
                   );
                 })}
-              </div>
-            </section>
+              </ul>
+            </Panel>
           );
         })()}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }
+
