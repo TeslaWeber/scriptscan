@@ -8,7 +8,18 @@ import { Card } from "@/components/ui/card";
 import { Toaster, toast } from "sonner";
 import { ScanLine, Loader2 } from "lucide-react";
 
-export const Route = createFileRoute("/auth")({ component: AuthPage });
+export const Route = createFileRoute("/auth")({
+  head: () => ({
+    meta: [
+      { title: "Staff Access — ScriptScan Office of Examinations" },
+      { name: "description", content: "Secure sign-in for examination officers to digitise marked scripts and compile verified result workbooks." },
+      { property: "og:title", content: "Staff Access — ScriptScan Office of Examinations" },
+      { property: "og:description", content: "Secure sign-in for examination officers." },
+    ],
+  }),
+  component: AuthPage,
+});
+
 
 function AuthPage() {
   const navigate = useNavigate();
