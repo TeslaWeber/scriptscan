@@ -12,8 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ResultsRouteImport } from './routes/results'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as HistoryIndexRouteImport } from './routes/history.index'
 import { Route as HistoryCourseRouteImport } from './routes/history.$course'
 
@@ -32,6 +34,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -40,6 +47,11 @@ const ReportsRoute = ReportsRouteImport.update({
 const ResultsRoute = ResultsRouteImport.update({
   id: '/results',
   path: '/results',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoryIndexRoute = HistoryIndexRouteImport.update({
@@ -57,8 +69,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
+  '/help': typeof HelpRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
+  '/settings': typeof SettingsRoute
   '/history/$course': typeof HistoryCourseRoute
   '/history/': typeof HistoryIndexRoute
 }
@@ -66,8 +80,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
+  '/help': typeof HelpRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
+  '/settings': typeof SettingsRoute
   '/history/$course': typeof HistoryCourseRoute
   '/history': typeof HistoryIndexRoute
 }
@@ -76,8 +92,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
+  '/help': typeof HelpRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
+  '/settings': typeof SettingsRoute
   '/history/$course': typeof HistoryCourseRoute
   '/history/': typeof HistoryIndexRoute
 }
@@ -87,8 +105,10 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
+    | '/help'
     | '/reports'
     | '/results'
+    | '/settings'
     | '/history/$course'
     | '/history/'
   fileRoutesByTo: FileRoutesByTo
@@ -96,8 +116,10 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
+    | '/help'
     | '/reports'
     | '/results'
+    | '/settings'
     | '/history/$course'
     | '/history'
   id:
@@ -105,8 +127,10 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
+    | '/help'
     | '/reports'
     | '/results'
+    | '/settings'
     | '/history/$course'
     | '/history/'
   fileRoutesById: FileRoutesById
@@ -115,8 +139,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   DashboardRoute: typeof DashboardRoute
+  HelpRoute: typeof HelpRoute
   ReportsRoute: typeof ReportsRoute
   ResultsRoute: typeof ResultsRoute
+  SettingsRoute: typeof SettingsRoute
   HistoryCourseRoute: typeof HistoryCourseRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
 }
@@ -144,6 +170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports': {
       id: '/reports'
       path: '/reports'
@@ -156,6 +189,13 @@ declare module '@tanstack/react-router' {
       path: '/results'
       fullPath: '/results'
       preLoaderRoute: typeof ResultsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/history/': {
@@ -179,8 +219,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   DashboardRoute: DashboardRoute,
+  HelpRoute: HelpRoute,
   ReportsRoute: ReportsRoute,
   ResultsRoute: ResultsRoute,
+  SettingsRoute: SettingsRoute,
   HistoryCourseRoute: HistoryCourseRoute,
   HistoryIndexRoute: HistoryIndexRoute,
 }

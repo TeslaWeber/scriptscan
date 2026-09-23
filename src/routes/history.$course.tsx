@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, FileSpreadsheet, Loader2, Trash2, GraduationCap, Save, History as HistoryIcon, Download } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, Loader2, Trash2, Save, Download } from "lucide-react";
+import { AppShell, Panel, StatusPill } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Toaster, toast } from "sonner";
@@ -118,97 +119,137 @@ function HistoryCourse() {
     toast.success(`Version ${v.version} removed`);
   };
 
+  const incomplete = rows.filter((r) => !r.matric.trim() || r.score.trim() === "").length;
+
   return (
-    <div className="min-h-screen">
-      <Toaster richColors position="top-center" />
-      <header className="border-b-2 border-primary/80 bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-4xl px-4 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-11 w-11 rounded-sm border border-[color:var(--color-brass)]/70 flex items-center justify-center flex-shrink-0">
-              <GraduationCap className="h-6 w-6 text-[color:var(--color-brass)]" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-display text-xl leading-tight truncate">{course}</p>
-              <p className="text-[11px] uppercase tracking-[0.22em] opacity-70">Archived session · edit &amp; re-export</p>
-            </div>
-          </div>
+    <AppShell
+      title={course}
+      description="Review, correct and re-issue the result workbook for this examination."
+      session={course}
+      actions={
+        <>
           <Link to="/history">
-            <Button variant="ghost" size="sm" className="gap-1 text-primary-foreground hover:bg-primary-foreground/10">
-              <ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">History</span>
+            <Button variant="outline" className="h-10 gap-1.5">
+              <ArrowLeft className="h-4 w-4" /> Examinations
             </Button>
           </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-4xl px-4 py-8 space-y-5">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="font-display text-2xl">Edit archived records</h1>
-          <Button onClick={reExport} disabled={exporting || !rows.length} className="gap-2">
+          <Button onClick={reExport} disabled={exporting || !rows.length} className="h-10 gap-2">
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
             Re-export .xlsx
           </Button>
-        </div>
+        </>
+      }
+    >
+      <Toaster richColors position="top-center" />
 
-        {loading ? (
-          <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Retrieving records…</div>
-        ) : rows.length === 0 ? (
-          <Card className="p-10 text-center text-sm text-muted-foreground">No records archived for this course.</Card>
-        ) : (
-          <div className="grid gap-3">
-            {rows.map((r) => (
-              <Card key={r.id} className="p-3" style={{ boxShadow: "var(--shadow-card)" }}>
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px_auto_auto] gap-2 items-end">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Matric No.</Label>
-                    <Input value={r.matric} className="font-mono" placeholder="—"
-                      onChange={(e) => update(r.id, { matric: e.target.value.toUpperCase() })} />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Score</Label>
-                    <Input value={r.score} inputMode="decimal" className="font-mono" placeholder="—"
-                      onChange={(e) => update(r.id, { score: e.target.value })} />
-                  </div>
-                  <Button size="sm" onClick={() => save(r)} disabled={!r.dirty || savingId === r.id} className="gap-1">
-                    {savingId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Save
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => remove(r.id)} title="Delete permanently">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-        <section className="space-y-3 pt-4">
-          <div className="flex items-center gap-2 border-b border-border pb-2">
-            <HistoryIcon className="h-4 w-4 text-muted-foreground" />
-            <h2 className="font-display text-xl">Saved export versions</h2>
-            <span className="text-xs text-muted-foreground">{versions.length} saved</span>
-          </div>
-          {versions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No exports saved yet — each re-export creates a new version here.</p>
+      <div className="grid gap-6">
+        <Panel
+          title="Recorded scripts"
+          description={`${rows.length} record${rows.length === 1 ? "" : "s"}${incomplete ? ` · ${incomplete} require attention` : ""}`}
+        >
+          {loading ? (
+            <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Retrieving records…
+            </p>
+          ) : rows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No records stored for this examination.</p>
           ) : (
-            <div className="grid gap-2">
+            <ul className="grid gap-2.5">
+              {rows.map((r) => {
+                const bad = !r.matric.trim() || r.score.trim() === "";
+                return (
+                  <li
+                    key={r.id}
+                    className={`rounded-md border px-3.5 py-3 ${bad ? "border-destructive/40 bg-destructive/[0.04]" : "border-border"}`}
+                  >
+                    <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto_auto]">
+                      <div className="grid gap-1.5">
+                        <Label className="field-label" htmlFor={`m-${r.id}`}>Matric No.</Label>
+                        <Input
+                          id={`m-${r.id}`}
+                          value={r.matric}
+                          className="h-10 font-mono"
+                          placeholder="Not detected"
+                          onChange={(e) => update(r.id, { matric: e.target.value.toUpperCase() })}
+                        />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label className="field-label" htmlFor={`s-${r.id}`}>Score</Label>
+                        <Input
+                          id={`s-${r.id}`}
+                          value={r.score}
+                          inputMode="decimal"
+                          className="h-10 font-mono"
+                          placeholder="—"
+                          onChange={(e) => update(r.id, { score: e.target.value })}
+                        />
+                      </div>
+                      <Button className="h-10 gap-1.5" onClick={() => save(r)} disabled={!r.dirty || savingId === r.id}>
+                        {savingId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 text-destructive"
+                        onClick={() => remove(r.id)}
+                        aria-label="Delete record permanently"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {bad
+                        ? <StatusPill tone="error">Incomplete record</StatusPill>
+                        : <StatusPill tone="success">Verified</StatusPill>}
+                      {r.confidence && <StatusPill tone="neutral">Confidence: {r.confidence}</StatusPill>}
+                      {r.error && <span className="text-[13px] text-muted-foreground">{r.error}</span>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel
+          title="Saved export versions"
+          description={`${versions.length} workbook${versions.length === 1 ? "" : "s"} issued for this examination`}
+        >
+          {versions.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No workbooks issued yet — each re-export is stored here as a new version.
+            </p>
+          ) : (
+            <ul className="grid gap-2.5">
               {versions.map((v) => (
-                <Card key={v.id} className="p-3 flex flex-wrap items-center justify-between gap-3">
+                <li key={v.id} className="grid gap-2 rounded-md border border-border px-3.5 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <div className="min-w-0">
-                    <p className="font-medium">Version {v.version} · {v.record_count} record(s)</p>
-                    <p className="text-xs text-muted-foreground truncate">{v.filename} · {new Date(v.created_at).toLocaleString()}</p>
+                    <p className="font-medium text-foreground">Version {v.version} · {v.record_count} record(s)</p>
+                    <p className="truncate text-[13px] text-muted-foreground">
+                      {v.filename} · {new Date(v.created_at).toLocaleString()}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="secondary" className="gap-1" onClick={() => openVersion(v)}>
-                      <Download className="h-4 w-4" /> Open
+                  <div className="flex items-center gap-2 sm:justify-end">
+                    <Button size="sm" variant="outline" className="h-9 gap-1.5" onClick={() => openVersion(v)}>
+                      <Download className="h-4 w-4" /> Download
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteVersion(v)} title="Delete version">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-9 w-9 text-destructive"
+                      onClick={() => deleteVersion(v)}
+                      aria-label={`Delete version ${v.version}`}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                </Card>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-        </section>
-      </main>
-    </div>
+        </Panel>
+      </div>
+    </AppShell>
   );
 }
+

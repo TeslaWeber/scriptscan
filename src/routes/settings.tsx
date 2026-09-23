@@ -18,7 +18,7 @@ export const Route = createFileRoute("/settings")({
       { property: "og:description", content: "Account details, capture defaults and data handling." },
     ],
   }),
-  component: SettingsPage;
+  component: SettingsPage,
 });
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {

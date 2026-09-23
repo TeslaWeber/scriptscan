@@ -1,10 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Archive, ArrowLeft, FileSpreadsheet, FolderOpen, Loader2, AlertTriangle, GraduationCap } from "lucide-react";
+import { FileSpreadsheet, Loader2, Search } from "lucide-react";
+import { AppShell, Panel, StatusPill } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Toaster, toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadScoresWorkbook, saveExportVersion, type ExportRow } from "@/lib/exportVersions";
@@ -12,14 +11,15 @@ import { downloadScoresWorkbook, saveExportVersion, type ExportRow } from "@/lib
 export const Route = createFileRoute("/history/")({
   head: () => ({
     meta: [
-      { title: "History File — ScriptScan" },
-      { name: "description", content: "Browse every past exam capture session by course, reopen it for review, or re-export the Excel sheet." },
-      { property: "og:title", content: "History File — ScriptScan" },
-      { property: "og:description", content: "Browse past exam capture sessions by course and re-export results." },
+      { title: "Examinations — ScriptScan Office of Examinations" },
+      { name: "description", content: "Browse every recorded examination capture session by course, reopen it for review, or re-issue the result workbook." },
+      { property: "og:title", content: "Examinations — ScriptScan Office of Examinations" },
+      { property: "og:description", content: "Browse recorded examination sessions and re-issue result workbooks." },
     ],
   }),
   component: History,
 });
+
 
 type CourseSummary = {
   course: string;
@@ -84,63 +84,116 @@ function History() {
   const filtered = rows.filter((r) => r.course.toLowerCase().includes(q.trim().toLowerCase()));
 
   return (
-    <div className="min-h-screen">
+    <AppShell
+      title="Examinations"
+      description="All recorded capture sessions, grouped by course."
+      actions={
+        <Link to="/" search={{}}>
+          <Button className="h-10">New capture</Button>
+        </Link>
+      }
+    >
       <Toaster richColors position="top-center" />
-      <header className="border-b-2 border-primary/80 bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-sm border border-[color:var(--color-brass)]/70 flex items-center justify-center">
-              <GraduationCap className="h-6 w-6 text-[color:var(--color-brass)]" />
-            </div>
-            <div>
-              <p className="font-display text-xl leading-tight">History File</p>
-              <p className="text-[11px] uppercase tracking-[0.22em] opacity-70">Archived capture sessions</p>
-            </div>
+
+      <Panel
+        title="Examination register"
+        description={`${rows.length} examination${rows.length === 1 ? "" : "s"} recorded under your account`}
+        actions={
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input
+              aria-label="Search course code"
+              placeholder="Search course code"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="h-10 w-56 pl-9"
+            />
           </div>
-          <Link to="/" search={{}}>
-            <Button variant="ghost" size="sm" className="gap-1 text-primary-foreground hover:bg-primary-foreground/10">
-              <ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">Console</span>
-            </Button>
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
-        <div className="flex items-center gap-3">
-          <Archive className="h-5 w-5 text-muted-foreground" />
-          <Input placeholder="Search course code…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-sm" />
-        </div>
-
+        }
+      >
         {loading ? (
-          <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Retrieving archive…</div>
+          <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Retrieving examination records…
+          </p>
         ) : filtered.length === 0 ? (
-          <Card className="p-10 text-center text-sm text-muted-foreground">No archived work yet. Capture a course from the console.</Card>
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No examinations recorded yet. Begin a capture session to create one.
+          </p>
         ) : (
-          <div className="grid gap-3">
-            {filtered.map((r) => (
-              <Card key={r.course} className="p-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-l-[color:var(--color-brass)]" style={{ boxShadow: "var(--shadow-card)" }}>
-                <div className="min-w-0">
-                  <p className="font-display text-xl">{r.course}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.total} record(s) · {r.complete} complete · last activity {new Date(r.lastAt).toLocaleString()}
+          <>
+            <div className="-mx-4 hidden overflow-x-auto sm:-mx-5 md:block">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-y border-border bg-muted/60 text-left">
+                    {["Course", "Records", "Complete", "Status", "Last activity", "Actions"].map((h) => (
+                      <th key={h} scope="col" className="px-5 py-2.5 text-[12px] font-semibold text-muted-foreground">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r) => (
+                    <tr key={r.course} className="border-b border-border last:border-0 hover:bg-muted/40">
+                      <td className="px-5 py-3 font-medium text-foreground">{r.course}</td>
+                      <td className="px-5 py-3 tabular-nums">{r.total}</td>
+                      <td className="px-5 py-3 tabular-nums">{r.complete}</td>
+                      <td className="px-5 py-3">
+                        {r.incomplete > 0
+                          ? <StatusPill tone="warning">{r.incomplete} incomplete</StatusPill>
+                          : <StatusPill tone="success">Complete</StatusPill>}
+                      </td>
+                      <td className="px-5 py-3 text-muted-foreground">{new Date(r.lastAt).toLocaleString()}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link to="/history/$course" params={{ course: r.course }}>
+                            <Button variant="outline" size="sm" className="h-9">Open</Button>
+                          </Link>
+                          <Button
+                            size="sm"
+                            className="h-9 gap-1.5"
+                            onClick={() => exportCourse(r.course)}
+                            disabled={exporting === r.course}
+                          >
+                            {exporting === r.course
+                              ? <Loader2 className="h-4 w-4 animate-spin" />
+                              : <FileSpreadsheet className="h-4 w-4" />}
+                            Export
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <ul className="grid gap-3 md:hidden">
+              {filtered.map((r) => (
+                <li key={r.course} className="rounded-md border border-border px-3.5 py-3">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                    <p className="truncate font-medium text-foreground">{r.course}</p>
+                    {r.incomplete > 0
+                      ? <StatusPill tone="warning">{r.incomplete} incomplete</StatusPill>
+                      : <StatusPill tone="success">Complete</StatusPill>}
+                  </div>
+                  <p className="mt-1 text-[13px] text-muted-foreground">
+                    {r.complete} of {r.total} complete · {new Date(r.lastAt).toLocaleDateString()}
                   </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {r.incomplete > 0 && (
-                    <Badge variant="destructive" className="rounded-sm gap-1"><AlertTriangle className="h-3 w-3" />{r.incomplete} incomplete</Badge>
-                  )}
-                  <Link to="/history/$course" params={{ course: r.course }}>
-                    <Button variant="secondary" size="sm" className="gap-1"><FolderOpen className="h-4 w-4" /> Edit</Button>
-                  </Link>
-                  <Button size="sm" className="gap-1" onClick={() => exportCourse(r.course)} disabled={exporting === r.course}>
-                    {exporting === r.course ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} Excel
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link to="/history/$course" params={{ course: r.course }}>
+                      <Button variant="outline" size="sm" className="h-9">Open</Button>
+                    </Link>
+                    <Button size="sm" className="h-9 gap-1.5" onClick={() => exportCourse(r.course)} disabled={exporting === r.course}>
+                      {exporting === r.course ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                      Export
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
-      </main>
-    </div>
+      </Panel>
+    </AppShell>
+
   );
 }
