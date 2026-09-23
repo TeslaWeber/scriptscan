@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, FileSpreadsheet, Loader2, Trash2, GraduationCap, Save, History as HistoryIcon, Download } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, Loader2, Trash2, Save, Download } from "lucide-react";
+import { AppShell, Panel, StatusPill } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Toaster, toast } from "sonner";
