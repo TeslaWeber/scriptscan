@@ -72,42 +72,88 @@ function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen lg:grid lg:grid-cols-[minmax(0,1fr)_480px]">
       <Toaster richColors position="top-center" />
-      <Card className="w-full max-w-md p-6 space-y-6" style={{ boxShadow: "var(--shadow-card)" }}>
+
+      {/* Institutional panel */}
+      <section className="hidden flex-col justify-between bg-[color:var(--color-navy-dark)] px-12 py-12 lg:flex">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl flex items-center justify-center text-primary-foreground" style={{ background: "var(--gradient-brand)" }}>
-            <ScanLine className="h-5 w-5" />
+          <div className="grid h-9 w-9 place-items-center rounded-md border border-[color:var(--color-gold)]/60">
+            <ScanLine className="h-4.5 w-4.5 text-[color:var(--color-gold)]" aria-hidden />
           </div>
           <div>
-            <h1 className="text-lg font-semibold">ScriptScan</h1>
-            <p className="text-xs text-muted-foreground">Staff access only</p>
+            <p className="text-[15px] font-semibold leading-tight text-white">ScriptScan</p>
+            <p className="text-[10px] font-medium tracking-[0.14em] text-white/55">OFFICE OF EXAMINATIONS</p>
           </div>
         </div>
-        <form onSubmit={submit} className="space-y-4">
-          {mode === "signup" && (
-            <div className="space-y-2">
-              <Label htmlFor="name">Display name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Dr. Jane Doe" />
+
+        <div className="max-w-md">
+          <h2 className="text-[30px] font-semibold leading-[1.2] text-white">
+            Examination script digitisation and result compilation
+          </h2>
+          <p className="mt-4 text-[15px] leading-7 text-white/65">
+            Capture marked scripts by photograph, recorded video sweep or dictation, verify every matric number and
+            score, and issue auditable Excel workbooks.
+          </p>
+          <div className="mt-8 h-px w-16 bg-[color:var(--color-gold)]" />
+        </div>
+
+        <p className="text-[12px] text-white/45">Authorised examination officers only. All activity is attributable to your account.</p>
+      </section>
+
+      {/* Form */}
+      <section className="flex min-h-screen items-center justify-center bg-card px-5 py-12 lg:min-h-0">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <div className="grid h-9 w-9 place-items-center rounded-md bg-[color:var(--color-navy)]">
+              <ScanLine className="h-4.5 w-4.5 text-[color:var(--color-gold)]" aria-hidden />
             </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <div>
+              <p className="text-[15px] font-semibold leading-tight">ScriptScan</p>
+              <p className="text-[10px] font-medium tracking-[0.14em] text-muted-foreground">OFFICE OF EXAMINATIONS</p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
-          </div>
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {mode === "signin" ? "Sign in" : "Create account"}
-          </Button>
-        </form>
-        <button type="button" onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="text-sm text-muted-foreground hover:text-foreground w-full text-center">
-          {mode === "signin" ? "Need an account? Sign up" : "Already have an account? Sign in"}
-        </button>
-      </Card>
+
+          <h1 className="text-[24px] font-semibold tracking-[-0.02em]">
+            {mode === "signin" ? "Staff sign in" : "Request staff access"}
+          </h1>
+          <p className="mt-1.5 text-[14px] text-muted-foreground">
+            {mode === "signin"
+              ? "Use your institutional credentials to continue."
+              : "Register an examination officer account for this workstation."}
+          </p>
+
+          <form onSubmit={submit} className="mt-7 grid gap-4">
+            {mode === "signup" && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="name" className="field-label">Display name</Label>
+                <Input id="name" className="h-10" value={name} onChange={(e) => setName(e.target.value)} placeholder="Dr. Jane Doe" />
+              </div>
+            )}
+            <div className="grid gap-1.5">
+              <Label htmlFor="email" className="field-label">Email address</Label>
+              <Input id="email" className="h-10" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="password" className="field-label">Password</Label>
+              <Input id="password" className="h-10" type="password" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <Button type="submit" className="mt-1 h-10 w-full" disabled={busy}>
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {mode === "signin" ? "Sign in" : "Create account"}
+            </Button>
+          </form>
+
+          <button
+            type="button"
+            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+            className="mt-6 w-full text-center text-[13px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            {mode === "signin" ? "Need an account? Request access" : "Already registered? Sign in"}
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
+
