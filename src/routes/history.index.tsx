@@ -1,10 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Archive, ArrowLeft, FileSpreadsheet, FolderOpen, Loader2, AlertTriangle, GraduationCap } from "lucide-react";
+import { FileSpreadsheet, Loader2, Search } from "lucide-react";
+import { AppShell, Panel, StatusPill } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Toaster, toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadScoresWorkbook, saveExportVersion, type ExportRow } from "@/lib/exportVersions";
@@ -12,14 +11,15 @@ import { downloadScoresWorkbook, saveExportVersion, type ExportRow } from "@/lib
 export const Route = createFileRoute("/history/")({
   head: () => ({
     meta: [
-      { title: "History File — ScriptScan" },
-      { name: "description", content: "Browse every past exam capture session by course, reopen it for review, or re-export the Excel sheet." },
-      { property: "og:title", content: "History File — ScriptScan" },
-      { property: "og:description", content: "Browse past exam capture sessions by course and re-export results." },
+      { title: "Examinations — ScriptScan Office of Examinations" },
+      { name: "description", content: "Browse every recorded examination capture session by course, reopen it for review, or re-issue the result workbook." },
+      { property: "og:title", content: "Examinations — ScriptScan Office of Examinations" },
+      { property: "og:description", content: "Browse recorded examination sessions and re-issue result workbooks." },
     ],
   }),
   component: History,
 });
+
 
 type CourseSummary = {
   course: string;
