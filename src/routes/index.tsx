@@ -734,7 +734,7 @@ function Index() {
 
   const savedCount = records.filter((r) => r.status === "saved").length;
   const tabTrigger =
-    "flex-1 gap-2 rounded-[6px] text-[13px] font-medium data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-none sm:flex-none sm:px-4";
+    "min-w-0 flex-1 gap-1.5 rounded-[6px] px-2 text-[12px] font-medium data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-none sm:flex-none sm:gap-2 sm:px-4 sm:text-[13px]";
 
   return (
     <AppShell
@@ -745,7 +745,7 @@ function Index() {
         <Button
           onClick={() => setConfirmExport(true)}
           disabled={!course.trim() || exportingScores}
-          className="h-10 gap-2"
+          className="h-10 w-full gap-2 sm:w-auto"
         >
           {exportingScores ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
           Export Scores .xlsx
@@ -807,14 +807,14 @@ function Index() {
         {/* Step 2 — capture method */}
         <Panel title="2. Capture method" description="All three methods file into the same verification register.">
           <Tabs defaultValue="upload">
-            <TabsList className="mb-5 h-11 w-full justify-start gap-1 rounded-md bg-muted p-1 sm:w-auto">
+            <TabsList className="mb-5 grid h-11 w-full grid-cols-3 gap-1 rounded-md bg-muted p-1 sm:inline-flex sm:w-auto">
               <TabsTrigger value="upload" className={tabTrigger}><Upload className="h-4 w-4" />Photographs</TabsTrigger>
               <TabsTrigger value="video" className={tabTrigger}><Film className="h-4 w-4" />Video sweep</TabsTrigger>
               <TabsTrigger value="voice" className={tabTrigger}><Mic className="h-4 w-4" />Dictation</TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="mt-0">
-              <div className="rounded-md border border-dashed border-border bg-muted/40 px-5 py-8 text-center">
+              <div className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center sm:px-5 sm:py-8">
                 <h3 className="section-title">Upload marked scripts</h3>
                 <p className="mx-auto mt-1.5 max-w-lg text-[14px] text-muted-foreground">
                   Select any number of photographs. Everything is filed under{" "}
@@ -846,7 +846,7 @@ function Index() {
             </TabsContent>
 
             <TabsContent value="video" className="mt-0">
-              <div className="rounded-md border border-dashed border-border bg-muted/40 px-5 py-8 text-center">
+              <div className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center sm:px-5 sm:py-8">
                 <h3 className="section-title">Recorded video sweep</h3>
                 <p className="mx-auto mt-1.5 max-w-xl text-[14px] text-muted-foreground">
                   Upload a video of the scripts being turned over. The footage is walked frame by frame — blurred and
@@ -886,7 +886,7 @@ function Index() {
             </TabsContent>
 
             <TabsContent value="voice" className="mt-0">
-              <div className="rounded-md border border-dashed border-border bg-muted/40 px-5 py-8 text-center">
+              <div className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center sm:px-5 sm:py-8">
                 <h3 className="section-title">Spoken dictation</h3>
                 <p className="mx-auto mt-1.5 max-w-xl text-[14px] text-muted-foreground">
                   Press record and read out entries one after another — “{DEFAULT_MATRIC_SAMPLE}, score 45” — then press
@@ -951,7 +951,7 @@ function Index() {
                   return (
                     <li
                       key={r.id}
-                      className={`flex items-start gap-3 rounded-md border px-3.5 py-3 ${
+                      className={`grid min-w-0 gap-3 rounded-md border px-3 py-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:px-3.5 ${
                         incomplete
                           ? "border-destructive/40 border-l-[3px] border-l-destructive bg-destructive/[0.04]"
                           : isDup || r.status === "pending-merge"
@@ -960,15 +960,15 @@ function Index() {
                       }`}
                     >
                       {r.preview ? (
-                        <a href={r.preview} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                          <a href={r.preview} target="_blank" rel="noopener noreferrer" className="block w-full sm:w-auto">
                           <img
                             src={r.preview}
                             alt={`Captured script ${r.fileName}`}
-                            className="h-20 w-20 rounded-md border border-border object-cover transition hover:opacity-85 sm:h-24 sm:w-24"
+                            className="h-32 w-full rounded-md border border-border object-cover transition hover:opacity-85 sm:h-24 sm:w-24"
                           />
                         </a>
                       ) : (
-                        <div className="grid h-20 w-20 shrink-0 place-items-center rounded-md border border-border text-[11px] font-medium text-muted-foreground sm:h-24 sm:w-24">
+                        <div className="grid h-20 w-full place-items-center rounded-md border border-border text-[11px] font-medium text-muted-foreground sm:h-24 sm:w-24 sm:shrink-0">
                           {r.fileName === "dictated" ? "Dictation" : "Filed"}
                         </div>
                       )}
@@ -987,7 +987,7 @@ function Index() {
                           {r.status === "pending-merge" && <StatusPill tone="warning"><GitMerge className="h-3 w-3" />Merge required</StatusPill>}
                           {isDup && <StatusPill tone="warning">Duplicate ({matricCounts.get(matricUpper)})</StatusPill>}
                           {r.confidence && <StatusPill tone="neutral">Confidence: {r.confidence}</StatusPill>}
-                          <span className="truncate text-[12px] text-muted-foreground">{r.fileName}</span>
+                          <span className="min-w-0 break-all text-[12px] text-muted-foreground">{r.fileName}</span>
                         </div>
 
                         {r.status === "pending-merge" && r.pendingMerge && (
@@ -1000,17 +1000,17 @@ function Index() {
                               {" "}This capture would write:{" "}
                               <strong>{parsed.score ?? "—"}{parsed.total != null ? `/${parsed.total}` : ""}</strong>.
                             </p>
-                            <div className="mt-2.5 flex flex-wrap gap-2">
+                            <div className="mt-2.5 grid gap-2 sm:flex sm:flex-wrap">
                               <Button size="sm" variant="destructive" className="h-9 gap-1.5" onClick={() => confirmMerge(r)}>
-                                <GitMerge className="h-4 w-4" /> Overwrite filed record
+                                <GitMerge className="h-4 w-4" /> <span className="truncate">Overwrite filed record</span>
                               </Button>
                               <Button size="sm" variant="outline" className="h-9" onClick={() => keepExisting(r)}>Keep existing</Button>
                             </div>
                           </div>
                         )}
 
-                        <div className="mt-3 grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto_auto]">
-                          <div className="grid gap-1.5">
+                        <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto_auto]">
+                          <div className="col-span-2 grid min-w-0 gap-1.5 sm:col-span-1">
                             <Label className="field-label" htmlFor={`matric-${r.id}`}>Matric No.</Label>
                             <Input
                               id={`matric-${r.id}`}
@@ -1024,7 +1024,7 @@ function Index() {
                               <p className="text-[12px] text-destructive">Does not match the {pattern} pattern</p>
                             )}
                           </div>
-                          <div className="grid gap-1.5">
+                          <div className="col-span-2 grid min-w-0 gap-1.5 sm:col-span-1">
                             <Label className="field-label" htmlFor={`score-${r.id}`}>Score</Label>
                             <Input
                               id={`score-${r.id}`}
@@ -1040,7 +1040,7 @@ function Index() {
                               <p className="text-[12px] text-destructive">Above the {maxScore.trim()} maximum</p>
                             )}
                           </div>
-                          <Button className="h-10" onClick={() => saveEdited(r)}>Save</Button>
+                          <Button className="h-10 w-full sm:w-auto" onClick={() => saveEdited(r)}>Save</Button>
                           <Button
                             variant="outline"
                             size="icon"

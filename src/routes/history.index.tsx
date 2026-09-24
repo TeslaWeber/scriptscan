@@ -99,14 +99,14 @@ function History() {
         title="Examination register"
         description={`${rows.length} examination${rows.length === 1 ? "" : "s"} recorded under your account`}
         actions={
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input
               aria-label="Search course code"
               placeholder="Search course code"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="h-10 w-56 pl-9"
+              className="h-10 w-full pl-9 sm:w-56"
             />
           </div>
         }
