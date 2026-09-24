@@ -1,3 +1,4 @@
+import { AppShell, Panel, StatusPill } from "@/components/app-shell";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
