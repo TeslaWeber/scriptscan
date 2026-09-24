@@ -129,11 +129,11 @@ function HistoryCourse() {
       actions={
         <>
           <Link to="/history">
-            <Button variant="outline" className="h-10 gap-1.5">
+            <Button variant="outline" className="h-10 flex-1 gap-1.5 sm:flex-none">
               <ArrowLeft className="h-4 w-4" /> Examinations
             </Button>
           </Link>
-          <Button onClick={reExport} disabled={exporting || !rows.length} className="h-10 gap-2">
+          <Button onClick={reExport} disabled={exporting || !rows.length} className="h-10 flex-1 gap-2 sm:flex-none">
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
             Re-export .xlsx
           </Button>
@@ -162,8 +162,8 @@ function HistoryCourse() {
                     key={r.id}
                     className={`rounded-md border px-3.5 py-3 ${bad ? "border-destructive/40 bg-destructive/[0.04]" : "border-border"}`}
                   >
-                    <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto_auto]">
-                      <div className="grid gap-1.5">
+                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto_auto]">
+                      <div className="col-span-2 grid min-w-0 gap-1.5 sm:col-span-1">
                         <Label className="field-label" htmlFor={`m-${r.id}`}>Matric No.</Label>
                         <Input
                           id={`m-${r.id}`}
@@ -173,7 +173,7 @@ function HistoryCourse() {
                           onChange={(e) => update(r.id, { matric: e.target.value.toUpperCase() })}
                         />
                       </div>
-                      <div className="grid gap-1.5">
+                      <div className="col-span-2 grid min-w-0 gap-1.5 sm:col-span-1">
                         <Label className="field-label" htmlFor={`s-${r.id}`}>Score</Label>
                         <Input
                           id={`s-${r.id}`}
@@ -184,7 +184,7 @@ function HistoryCourse() {
                           onChange={(e) => update(r.id, { score: e.target.value })}
                         />
                       </div>
-                      <Button className="h-10 gap-1.5" onClick={() => save(r)} disabled={!r.dirty || savingId === r.id}>
+                      <Button className="h-10 w-full gap-1.5 sm:w-auto" onClick={() => save(r)} disabled={!r.dirty || savingId === r.id}>
                         {savingId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
                       </Button>
                       <Button
@@ -202,7 +202,7 @@ function HistoryCourse() {
                         ? <StatusPill tone="error">Incomplete record</StatusPill>
                         : <StatusPill tone="success">Verified</StatusPill>}
                       {r.confidence && <StatusPill tone="neutral">Confidence: {r.confidence}</StatusPill>}
-                      {r.error && <span className="text-[13px] text-muted-foreground">{r.error}</span>}
+                      {r.error && <span className="min-w-0 break-words text-[13px] text-muted-foreground">{r.error}</span>}
                     </div>
                   </li>
                 );

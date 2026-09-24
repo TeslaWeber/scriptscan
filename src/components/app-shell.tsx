@@ -99,7 +99,7 @@ export function AppShell({
   const initials = (email || "?").slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen min-w-0 overflow-x-hidden bg-background">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-[color:var(--color-navy-dark)] lg:flex">
         <SidebarBrand />
@@ -116,17 +116,17 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="lg:pl-60">
+      <div className="min-w-0 lg:pl-60">
         {/* Top bar */}
         <header className="sticky top-0 z-20 h-16 border-b border-border bg-card">
-          <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-3 px-4 sm:px-6">
+          <div className="mx-auto grid h-16 max-w-[1400px] grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 px-3 sm:gap-3 sm:px-6">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open navigation">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-64 border-none bg-[color:var(--color-navy-dark)] p-0">
+              <SheetContent side="left" className="w-[min(18rem,calc(100vw-2rem))] border-none bg-[color:var(--color-navy-dark)] p-0 text-white">
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
                 <SidebarBrand />
                 <div className="py-4">
@@ -144,7 +144,7 @@ export function AppShell({
               </SheetContent>
             </Sheet>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0">
               <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">
                 CURRENT SESSION
               </p>
@@ -171,18 +171,20 @@ export function AppShell({
               </div>
             </div>
 
-            <Button variant="ghost" size="icon" aria-label="Notifications" className="text-muted-foreground">
+            <Button variant="ghost" size="icon" aria-label="Notifications" className="hidden text-muted-foreground sm:inline-flex">
               <Bell className="h-[18px] w-[18px]" />
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-[color:var(--color-navy)] text-xs font-semibold text-white"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 bg-[color:var(--color-navy)] text-xs font-semibold text-white hover:bg-[color:var(--color-navy-dark)] hover:text-white"
                   aria-label="Account menu"
                 >
                   {initials}
-                </button>
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">
@@ -200,7 +202,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
+        <main className="mx-auto min-w-0 max-w-[1400px] px-3 py-5 sm:px-6 sm:py-8">
           <div className="mb-6 grid gap-3 sm:mb-8 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
             <div className="min-w-0">
               <h1 className="page-title text-foreground">{title}</h1>
@@ -208,9 +210,9 @@ export function AppShell({
                 <p className="mt-1 max-w-2xl text-[15px] text-muted-foreground">{description}</p>
               )}
             </div>
-            {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+            {actions && <div className="flex min-w-0 flex-wrap items-center gap-2 [&>*]:max-w-full">{actions}</div>}
           </div>
-          {children}
+          <div className="min-w-0">{children}</div>
         </main>
       </div>
     </div>
@@ -231,14 +233,14 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={`panel ${className}`}>
+    <section className={`panel min-w-0 overflow-hidden ${className}`}>
       {(title || actions) && (
         <div className="grid gap-2 border-b border-border px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
           <div className="min-w-0">
             {title && <h2 className="section-title text-foreground">{title}</h2>}
             {description && <p className="mt-0.5 text-[13px] text-muted-foreground">{description}</p>}
           </div>
-          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+          {actions && <div className="flex min-w-0 flex-wrap items-center gap-2 [&>*]:max-w-full">{actions}</div>}
         </div>
       )}
       <div className="px-4 py-4 sm:px-5 sm:py-5">{children}</div>

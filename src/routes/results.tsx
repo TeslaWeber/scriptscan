@@ -78,18 +78,18 @@ function Results() {
         title="Captured scripts"
         description={`${rows.length} scripts · ${verifiedCount} verified · ${rows.length - verifiedCount} require review`}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
+          <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            <div className="relative min-w-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
               <Input
                 aria-label="Search results"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search course or matric"
-                className="h-10 w-56 pl-9"
+                className="h-10 w-full pl-9 sm:w-56"
               />
             </div>
-            <div role="group" aria-label="Filter results" className="inline-flex rounded-md border border-border p-0.5">
+            <div role="group" aria-label="Filter results" className="grid grid-cols-3 rounded-md border border-border p-0.5">
               {(["all", "verified", "review"] as const).map((f) => (
                 <button
                   key={f}
