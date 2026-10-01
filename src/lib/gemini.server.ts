@@ -1,5 +1,5 @@
 // Server-only Gemini helper. Reads GEMINI_API_KEY from server env; never shipped to the browser.
-const MODEL = "gemini-2.5-flash";
+const MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
 
 type Part = { text: string } | { inline_data: { mime_type: string; data: string } };
 
@@ -21,18 +21,21 @@ export async function geminiJson<T>(opts: {
     },
   });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   let resp: Response | null = null;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body,
-    });
-    if (resp.status !== 429 && resp.status !== 503) break;
-    if (attempt === 4) break;
-    await sleep(Math.min(8000, 800 * 2 ** attempt) + Math.floor(Math.random() * 400));
+  for (const model of MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body,
+      });
+      if (resp.ok || ![429, 500, 502, 503, 504].includes(resp.status)) break;
+      if (attempt < 2) await sleep(1000 * 2 ** attempt + Math.floor(Math.random() * 400));
+    }
+    // Move to the next model only when this one is unavailable/overloaded.
+    if (resp.ok || ![404, 500, 502, 503, 504].includes(resp.status)) break;
   }
 
   if (!resp || !resp.ok) {
@@ -42,7 +45,10 @@ export async function geminiJson<T>(opts: {
     if (status === 429) throw new Error("The scanner is busy (rate limited). Please wait a few seconds and try again.");
     if (status === 400) throw new Error("Gemini could not read that file. Check the image/audio and try again.");
     if (status === 401 || status === 403) throw new Error("GEMINI_API_KEY was rejected. Check the key on the server.");
-    throw new Error("Gemini service error. Please try again.");
+    let detail = "";
+    try { detail = JSON.parse(t)?.error?.message ?? ""; } catch { /* ignore */ }
+    if (status === 503 || status === 500) throw new Error("Google Gemini is temporarily overloaded. Please wait a minute and try again.");
+    throw new Error(`Gemini service error (${status ?? "no response"})${detail ? `: ${detail}` : ""}`);
   }
 
   const json = await resp.json();
