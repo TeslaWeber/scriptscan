@@ -35,7 +35,7 @@ export async function geminiJson<T>(opts: {
       if (attempt < 2) await sleep(1000 * 2 ** attempt + Math.floor(Math.random() * 400));
     }
     // Move to the next model only when this one is unavailable/overloaded.
-    if (resp.ok || ![404, 500, 502, 503, 504].includes(resp.status)) break;
+    if (resp && (resp.ok || ![404, 500, 502, 503, 504].includes(resp.status))) break;
   }
 
   if (!resp || !resp.ok) {
