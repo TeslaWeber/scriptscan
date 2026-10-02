@@ -37,7 +37,8 @@ Rules:
 
     const { geminiJson } = await import("./gemini.server");
     const fmt = data.format.toLowerCase();
-    const mime = fmt.includes("/") ? fmt : `audio/${fmt === "mp3" ? "mpeg" : fmt}`;
+    const map: Record<string, string> = { mp3: "audio/mpeg", m4a: "audio/mp4", mp4: "audio/mp4", "audio/m4a": "audio/mp4", "audio/x-m4a": "audio/mp4", wav: "audio/wav", webm: "audio/webm", ogg: "audio/ogg", aac: "audio/aac", flac: "audio/flac" };
+    const mime = (map[fmt] ?? (fmt.includes("/") ? fmt : `audio/${fmt}`)).split(";")[0];
     const args = await geminiJson<{ entries: DictatedEntry[]; transcript?: string }>({
       system: systemPrompt,
       parts: [
