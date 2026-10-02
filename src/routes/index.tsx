@@ -75,6 +75,69 @@ function fileToBase64(file: Blob): Promise<{ base64: string; mime: string }> {
   });
 }
 
+/** Shrink large phone photos so uploads stay well under hosting request-size limits (e.g. Vercel 4.5 MB). */
+async function prepareImage(file: Blob): Promise<{ base64: string; mime: string }> {
+  try {
+    if (file.size < 900_000 && /image\/(jpeg|png|webp)/.test(file.type)) return await fileToBase64(file);
+    const bmp = await createImageBitmap(file);
+    const MAX = 2000;
+    const scale = Math.min(1, MAX / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale);
+    const h = Math.round(bmp.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return await fileToBase64(file);
+    ctx.drawImage(bmp, 0, 0, w, h);
+    bmp.close?.();
+    const out: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.88));
+    if (!out) return await fileToBase64(file);
+    return await fileToBase64(out);
+  } catch {
+    return await fileToBase64(file);
+  }
+}
+
+/** Convert a browser recording to 16 kHz mono WAV (universally accepted by Gemini) when it fits the upload limit. */
+async function prepareAudio(blob: Blob, mime: string): Promise<{ base64: string; format: string }> {
+  const fallback = async () => {
+    const { base64 } = await fileToBase64(blob);
+    return { base64, format: mime.includes("webm") ? "audio/webm" : mime.includes("ogg") ? "audio/ogg" : "audio/mp4" };
+  };
+  try {
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx = new AC();
+    const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+    ctx.close?.();
+    const rate = 16000;
+    const length = Math.ceil(decoded.duration * rate);
+    if (length * 2 > 3_000_000) return await fallback(); // too long for one WAV upload
+    const off = new OfflineAudioContext(1, length, rate);
+    const src = off.createBufferSource();
+    src.buffer = decoded;
+    src.connect(off.destination);
+    src.start();
+    const rendered = await off.startRendering();
+    const data = rendered.getChannelData(0);
+    const buf = new ArrayBuffer(44 + data.length * 2);
+    const v = new DataView(buf);
+    const ws = (o: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    ws(0, "RIFF"); v.setUint32(4, 36 + data.length * 2, true); ws(8, "WAVE"); ws(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    ws(36, "data"); v.setUint32(40, data.length * 2, true);
+    for (let i = 0; i < data.length; i++) {
+      const s = Math.max(-1, Math.min(1, data[i]));
+      v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    }
+    const { base64 } = await fileToBase64(new Blob([buf], { type: "audio/wav" }));
+    return { base64, format: "audio/wav" };
+  } catch {
+    return await fallback();
+  }
+}
+
 /** Parse a score input that may be "45", "45/60", "45 / 60". */
 function parseScore(raw: string): { score: number | null; total: number | null; ok: boolean; reason?: string } {
   const s = raw.trim();
@@ -270,7 +333,7 @@ function Index() {
   const runOcr = useCallback(async (recId: string, file: Blob) => {
     updateRecord(recId, { status: "scanning", error: undefined });
     try {
-      const { base64, mime } = await fileToBase64(file);
+      const { base64, mime } = await prepareImage(file);
       const result = await extractScript({ data: { imageBase64: base64, mimeType: mime } });
       const matric = (result.matric_no ?? "").toUpperCase().replace(/\s+/g, "");
       const score = result.score != null ? String(result.score) : "";
@@ -556,8 +619,7 @@ function Index() {
   const processDictation = async (blob: Blob, mime: string) => {
     setTranscribing(true);
     try {
-      const { base64 } = await fileToBase64(blob);
-      const format = mime.includes("webm") ? "webm" : "m4a";
+      const { base64, format } = await prepareAudio(blob, mime);
       const out = await extractFromAudio({ data: { audioBase64: base64, format, sample: pattern } });
       setTranscript(out.transcript ?? "");
       if (!out.entries.length) { toast.warning("No results detected in the recording"); return; }
