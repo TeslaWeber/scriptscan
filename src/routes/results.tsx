@@ -31,7 +31,6 @@ type Row = {
   created_at: string;
 };
 
-const CONF_PCT: Record<string, string> = { high: "98%", medium: "84%", low: "62%" };
 
 function Results() {
   const { ready } = useSessionGuard();
