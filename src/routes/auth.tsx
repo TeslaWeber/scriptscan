@@ -33,9 +33,21 @@ function AuthPage() {
   const social = async (provider: "google" | "apple" | "microsoft") => {
     setBusy(true);
     try {
-      const result = await lovable.auth.signInWithOAuth(provider, { redirect_uri: window.location.origin });
+      // Off Lovable hosting (e.g. Vercel): sign in via the Lovable-hosted bridge, which hands the session back.
+      if (!isLovableHost()) {
+        const back = `${window.location.origin}/auth`;
+        window.location.href = `${BRIDGE_ORIGIN}/auth?bridge=${provider}&return=${encodeURIComponent(back)}`;
+        return;
+      }
+      const params = new URLSearchParams(window.location.search);
+      const ret = params.get("return");
+      const redirect = ret && isAllowedReturn(ret)
+        ? `${window.location.origin}/auth?return=${encodeURIComponent(ret)}`
+        : window.location.origin;
+      const result = await lovable.auth.signInWithOAuth(provider, { redirect_uri: redirect });
       if (result.error) { toast.error(result.error.message ?? "Sign-in failed"); return; }
       if (result.redirected) return;
+      if (ret && isAllowedReturn(ret)) { await handBack(ret); return; }
       navigate({ to: "/" });
     } catch (e: any) {
       toast.error(e?.message ?? "Sign-in failed");
@@ -43,6 +55,29 @@ function AuthPage() {
       setBusy(false);
     }
   };
+
+  // Bridge: receive session from Lovable host, or start/finish the bridge on the Lovable host.
+  useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    const at = hash.get("bridge_at"), rt = hash.get("bridge_rt");
+    if (at && rt) {
+      history.replaceState(null, "", window.location.pathname);
+      supabase.auth.setSession({ access_token: at, refresh_token: rt }).then(({ error }) => {
+        if (error) toast.error(error.message); else navigate({ to: "/" });
+      });
+      return;
+    }
+    if (!isLovableHost()) return;
+    const params = new URLSearchParams(window.location.search);
+    const ret = params.get("return");
+    if (!ret || !isAllowedReturn(ret)) return;
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) { handBack(ret); return; }
+      const p = params.get("bridge");
+      if (p === "google" || p === "apple" || p === "microsoft") social(p);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {

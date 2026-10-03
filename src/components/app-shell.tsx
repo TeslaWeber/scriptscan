@@ -17,6 +17,7 @@ const NAV = [
   { label: "Examinations", to: "/history", icon: FolderOpen },
   { label: "Capture", to: "/", icon: ScanLine },
   { label: "Results", to: "/results", icon: Table2 },
+  { label: "Lookup", to: "/lookup", icon: Search },
   { label: "Reports", to: "/reports", icon: FileBarChart2 },
   { label: "Settings", to: "/settings", icon: Settings2 },
 ] as const;
