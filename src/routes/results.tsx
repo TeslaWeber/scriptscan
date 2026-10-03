@@ -13,7 +13,7 @@ export const Route = createFileRoute("/results")({
   head: () => ({
     meta: [
       { title: "Results — ScriptScan Office of Examinations" },
-      { name: "description", content: "Search, filter and verify captured examination results with matric numbers, scores and recognition confidence." },
+      { name: "description", content: "Search, filter and verify captured examination results with matric numbers and scores." },
       { property: "og:title", content: "Results — ScriptScan Office of Examinations" },
       { property: "og:description", content: "Search and verify captured examination results." },
     ],
@@ -31,7 +31,6 @@ type Row = {
   created_at: string;
 };
 
-const CONF_PCT: Record<string, string> = { high: "98%", medium: "84%", low: "62%" };
 
 function Results() {
   const { ready } = useSessionGuard();
@@ -70,7 +69,7 @@ function Results() {
   return (
     <AppShell
       title="Results"
-      description="Every captured script record, with recognition confidence and review status."
+      description="Every captured script record, with review status."
     >
       <Toaster richColors position="top-center" />
 
@@ -121,7 +120,7 @@ function Results() {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-y border-border bg-muted/60 text-left">
-                    {["Status", "Course", "Matric No.", "Score", "Maximum", "Confidence", "Captured", "Action"].map((h) => (
+                    {["Status", "Course", "Matric No.", "Score", "Maximum", "Captured", "Action"].map((h) => (
                       <th key={h} scope="col" className="px-5 py-2.5 text-[12px] font-semibold text-muted-foreground">{h}</th>
                     ))}
                   </tr>
@@ -138,7 +137,6 @@ function Results() {
                         <td className="px-5 py-3 font-mono text-foreground">{r.matric ?? "—"}</td>
                         <td className="px-5 py-3 tabular-nums">{r.score ?? "—"}</td>
                         <td className="px-5 py-3 tabular-nums text-muted-foreground">{r.total ?? "—"}</td>
-                        <td className="px-5 py-3 text-muted-foreground">{r.confidence ? CONF_PCT[r.confidence] ?? r.confidence : "—"}</td>
                         <td className="px-5 py-3 text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</td>
                         <td className="px-5 py-3">
                           <Link to="/history/$course" params={{ course: r.course }} className="text-sm font-medium text-primary underline-offset-4 hover:underline">
@@ -163,7 +161,6 @@ function Results() {
                     </div>
                     <p className="mt-1 text-[13px] text-muted-foreground">
                       {r.course} · Score {r.score ?? "—"}{r.total != null ? ` / ${r.total}` : ""}
-                      {r.confidence ? ` · ${CONF_PCT[r.confidence] ?? r.confidence}` : ""}
                     </p>
                     <Link to="/history/$course" params={{ course: r.course }} className="mt-2 inline-block text-sm font-medium text-primary underline-offset-4 hover:underline">
                       {verified ? "View record" : "Review record"}

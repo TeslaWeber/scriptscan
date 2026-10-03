@@ -1048,7 +1048,6 @@ function Index() {
                           {r.status === "saved" && <StatusPill tone="success"><CheckCircle2 className="h-3 w-3" />Filed</StatusPill>}
                           {r.status === "pending-merge" && <StatusPill tone="warning"><GitMerge className="h-3 w-3" />Merge required</StatusPill>}
                           {isDup && <StatusPill tone="warning">Duplicate ({matricCounts.get(matricUpper)})</StatusPill>}
-                          {r.confidence && <StatusPill tone="neutral">Confidence: {r.confidence}</StatusPill>}
                           <span className="min-w-0 break-all text-[12px] text-muted-foreground">{r.fileName}</span>
                         </div>
 
@@ -1058,7 +1057,7 @@ function Index() {
                               A filed record already exists for <strong>{matricUpper}</strong> in <strong>{course}</strong>.
                               {" "}Existing score:{" "}
                               <strong>{r.pendingMerge.existingScore ?? "—"}{r.pendingMerge.existingTotal != null ? `/${r.pendingMerge.existingTotal}` : ""}</strong>
-                              {r.pendingMerge.existingConfidence ? ` (confidence: ${r.pendingMerge.existingConfidence})` : ""}.
+                              .
                               {" "}This capture would write:{" "}
                               <strong>{parsed.score ?? "—"}{parsed.total != null ? `/${parsed.total}` : ""}</strong>.
                             </p>
@@ -1095,7 +1094,7 @@ function Index() {
                               onBlur={() => saveEdited(r)}
                               inputMode="decimal"
                               className={`h-10 font-mono ${r.score && !scoreValid ? "border-destructive" : ""}`}
-                              placeholder="45 or 45/60"
+                              placeholder="Score"
                             />
                             {r.score && !parsed.ok && <p className="text-[12px] text-destructive">Invalid: {parsed.reason}</p>}
                             {r.score && parsed.ok && overCap && (

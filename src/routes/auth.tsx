@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Toaster, toast } from "sonner";
-import { ScanLine, Loader2 } from "lucide-react";
+import { ScanLine, Loader2, Eye, EyeOff } from "lucide-react";
+import { lovable } from "@/integrations/lovable/index";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -27,6 +28,21 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const social = async (provider: "google" | "apple" | "microsoft") => {
+    setBusy(true);
+    try {
+      const result = await lovable.auth.signInWithOAuth(provider, { redirect_uri: window.location.origin });
+      if (result.error) { toast.error(result.error.message ?? "Sign-in failed"); return; }
+      if (result.redirected) return;
+      navigate({ to: "/" });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Sign-in failed");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -135,13 +151,32 @@ function AuthPage() {
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="password" className="field-label">Password</Label>
-              <Input id="password" className="h-10" type="password" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <div className="relative">
+                <Input id="password" className="h-10 pr-10" type={showPassword ? "text" : "password"} autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <Button type="submit" className="mt-1 h-10 w-full" disabled={busy}>
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {mode === "signin" ? "Sign in" : "Create account"}
             </Button>
           </form>
+
+          <div className="my-5 flex items-center gap-3 text-[12px] text-muted-foreground">
+            <span className="h-px flex-1 bg-border" /> or continue with <span className="h-px flex-1 bg-border" />
+          </div>
+          <div className="grid gap-2">
+            <Button type="button" variant="outline" className="h-10 w-full" disabled={busy} onClick={() => social("google")}>Continue with Google</Button>
+            <Button type="button" variant="outline" className="h-10 w-full" disabled={busy} onClick={() => social("apple")}>Continue with Apple</Button>
+            <Button type="button" variant="outline" className="h-10 w-full" disabled={busy} onClick={() => social("microsoft")}>Continue with Microsoft</Button>
+          </div>
 
           <button
             type="button"

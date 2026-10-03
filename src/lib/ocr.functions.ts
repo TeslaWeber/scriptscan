@@ -18,7 +18,9 @@ From the script image, extract:
 Also report the bounding box of each detected value as [x, y, width, height] using fractions of the image width/height (0..1).
 If a value is unreadable or missing, return null for it. Be tolerant of handwriting, ink color, and orientation.
 
-CRITICAL — read every digit of the matric number and score character by character with absolute precision. Handwritten digits are frequently confused: 4 vs 6 vs 9 vs 0, 1 vs 7, 3 vs 5 vs 8. Examine each glyph's shape carefully before deciding. Never guess a digit from context or pattern; only report what is actually written. If you are torn between two digits for a character, prefer the reading where the handwriting stroke is clearest, and lower your confidence accordingly.`;
+CRITICAL — read every digit of the matric number and score character by character with absolute precision. Handwritten digits are frequently confused: 4 vs 6 vs 9 vs 0, 1 vs 7, 3 vs 5 vs 8. Examine each glyph's shape carefully before deciding. Never guess a digit from context or pattern; only report what is actually written. If you are torn between two digits for a character, prefer the reading where the handwriting stroke is clearest, and lower your confidence accordingly.
+
+FULL MARKS ARE VALID: a score equal to the maximum (e.g. "60/60", "30/30", "100/100") is a correct, normal result. Record it exactly as written with high confidence — never treat it as suspicious, never return null for it, and never add a warning note about it.`;
 
     const { geminiJson } = await import("./gemini.server");
     const nullable = (type: string, extra: Record<string, unknown> = {}) => ({ type, nullable: true, ...extra });
