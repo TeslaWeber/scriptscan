@@ -226,3 +226,21 @@ function AuthPage() {
   );
 }
 
+
+const BRIDGE_ORIGIN = "https://scriptscan.lovable.app";
+function isLovableHost() {
+  const h = window.location.hostname;
+  return h.endsWith(".lovable.app") || h.endsWith(".lovableproject.com") || h === "localhost";
+}
+function isAllowedReturn(url: string) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && (u.hostname === "scriptscan.vercel.app" || /^scriptscan-[a-z0-9-]+\.vercel\.app$/.test(u.hostname));
+  } catch { return false; }
+}
+async function handBack(ret: string) {
+  const { data } = await supabase.auth.getSession();
+  const s = data.session;
+  if (!s) return;
+  window.location.href = `${ret}#bridge_at=${encodeURIComponent(s.access_token)}&bridge_rt=${encodeURIComponent(s.refresh_token)}`;
+}
