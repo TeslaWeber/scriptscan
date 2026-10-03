@@ -201,7 +201,6 @@ function HistoryCourse() {
                       {bad
                         ? <StatusPill tone="error">Incomplete record</StatusPill>
                         : <StatusPill tone="success">Verified</StatusPill>}
-                      {r.confidence && <StatusPill tone="neutral">Confidence: {r.confidence}</StatusPill>}
                       {r.error && <span className="min-w-0 break-words text-[13px] text-muted-foreground">{r.error}</span>}
                     </div>
                   </li>

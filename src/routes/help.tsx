@@ -29,7 +29,7 @@ const STEPS = [
   },
   {
     title: "4. Export the workbook",
-    body: "Exporting produces a versioned .xlsx containing matric number, score, recognition confidence and any notes, then clears the capture register for the next examination.",
+    body: "Exporting produces a versioned .xlsx containing matric number and score, then clears the capture register for the next examination.",
   },
 ];
 
@@ -61,7 +61,6 @@ function Help() {
             <li>Photograph scripts in even lighting with the matric number and score fully visible.</li>
             <li>Video sweeps run a second verification pass to catch skipped or misread scripts.</li>
             <li>Repeated detections of the same matric number are merged into one record.</li>
-            <li>Confidence values are recorded in every workbook so any figure can be traced back.</li>
             <li>Records are private to the signed-in examination officer.</li>
           </ul>
         </Panel>

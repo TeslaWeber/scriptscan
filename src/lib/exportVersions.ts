@@ -21,12 +21,12 @@ export type ExportVersion = {
 /** Build and download an .xlsx with traceability columns. */
 export function downloadScoresWorkbook(rows: ExportRow[], filename: string) {
   const aoa: (string | number)[][] = [
-    ["MATRIC NO.", "SCORE", "CONFIDENCE", "ERROR / NOTES"],
-    ...rows.map((r) => [r.matric, r.score, r.confidence ?? "", r.error ?? ""]),
+    ["MATRIC NO.", "SCORE"],
+    ...rows.map((r) => [r.matric, r.score]),
   ];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 14 }, { wch: 40 }];
-  ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: 3 } });
+  ws["!cols"] = [{ wch: 22 }, { wch: 10 }];
+  ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: 1 } });
   for (let i = 2; i <= aoa.length; i++) {
     const c = ws[`B${i}`];
     if (c) c.t = "n";

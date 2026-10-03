@@ -33,7 +33,9 @@ Rules:
 - Return one entry per student mentioned, in the spoken order.
 - score is the awarded mark; total is the maximum if stated ("out of 60", "45 over 60"), otherwise null.
 - If a matric number or score is unclear, still return the entry with null for the unclear field and a low confidence plus a short note.
-- Never invent students that were not spoken.`;
+- Never invent students that were not spoken.
+
+FULL MARKS ARE VALID: a score equal to the maximum (e.g. "60/60", "30/30", "100/100") is a correct, normal result. Record it exactly as written with high confidence — never treat it as suspicious, never return null for it, and never add a warning note about it.`;
 
     const { geminiJson } = await import("./gemini.server");
     const fmt = data.format.toLowerCase();
