@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as HelpRouteImport } from './routes/help'
+import { Route as LookupRouteImport } from './routes/lookup'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ResultsRouteImport } from './routes/results'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -37,6 +38,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const HelpRoute = HelpRouteImport.update({
   id: '/help',
   path: '/help',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LookupRoute = LookupRouteImport.update({
+  id: '/lookup',
+  path: '/lookup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
+  '/lookup': typeof LookupRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
+  '/lookup': typeof LookupRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
+  '/lookup': typeof LookupRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/help'
+    | '/lookup'
     | '/reports'
     | '/results'
     | '/settings'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/help'
+    | '/lookup'
     | '/reports'
     | '/results'
     | '/settings'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/help'
+    | '/lookup'
     | '/reports'
     | '/results'
     | '/settings'
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DashboardRoute: typeof DashboardRoute
   HelpRoute: typeof HelpRoute
+  LookupRoute: typeof LookupRoute
   ReportsRoute: typeof ReportsRoute
   ResultsRoute: typeof ResultsRoute
   SettingsRoute: typeof SettingsRoute
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/help'
       fullPath: '/help'
       preLoaderRoute: typeof HelpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lookup': {
+      id: '/lookup'
+      path: '/lookup'
+      fullPath: '/lookup'
+      preLoaderRoute: typeof LookupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -220,6 +240,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DashboardRoute: DashboardRoute,
   HelpRoute: HelpRoute,
+  LookupRoute: LookupRoute,
   ReportsRoute: ReportsRoute,
   ResultsRoute: ResultsRoute,
   SettingsRoute: SettingsRoute,
