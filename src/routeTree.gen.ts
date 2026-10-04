@@ -9,17 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CaptureRouteImport } from './routes/capture'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as LookupRouteImport } from './routes/lookup'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ResultsRouteImport } from './routes/results'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as HistoryIndexRouteImport } from './routes/history.index'
 import { Route as HistoryCourseRouteImport } from './routes/history.$course'
 
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -45,6 +53,11 @@ const LookupRoute = LookupRouteImport.update({
   path: '/lookup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -60,6 +73,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HistoryIndexRoute = HistoryIndexRouteImport.update({
   id: '/history/',
   path: '/history/',
@@ -72,96 +90,124 @@ const HistoryCourseRoute = HistoryCourseRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
   '/lookup': typeof LookupRoute
+  '/privacy': typeof PrivacyRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/history/$course': typeof HistoryCourseRoute
   '/history/': typeof HistoryIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
   '/lookup': typeof LookupRoute
+  '/privacy': typeof PrivacyRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/history/$course': typeof HistoryCourseRoute
   '/history': typeof HistoryIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
   '/lookup': typeof LookupRoute
+  '/privacy': typeof PrivacyRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/history/$course': typeof HistoryCourseRoute
   '/history/': typeof HistoryIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/auth'
     | '/capture'
     | '/dashboard'
     | '/help'
     | '/lookup'
+    | '/privacy'
     | '/reports'
     | '/results'
     | '/settings'
+    | '/terms'
     | '/history/$course'
     | '/history/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/auth'
     | '/capture'
     | '/dashboard'
     | '/help'
     | '/lookup'
+    | '/privacy'
     | '/reports'
     | '/results'
     | '/settings'
+    | '/terms'
     | '/history/$course'
     | '/history'
   id:
     | '__root__'
+    | '/'
     | '/auth'
     | '/capture'
     | '/dashboard'
     | '/help'
     | '/lookup'
+    | '/privacy'
     | '/reports'
     | '/results'
     | '/settings'
+    | '/terms'
     | '/history/$course'
     | '/history/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   CaptureRoute: typeof CaptureRoute
   DashboardRoute: typeof DashboardRoute
   HelpRoute: typeof HelpRoute
   LookupRoute: typeof LookupRoute
+  PrivacyRoute: typeof PrivacyRoute
   ReportsRoute: typeof ReportsRoute
   ResultsRoute: typeof ResultsRoute
   SettingsRoute: typeof SettingsRoute
+  TermsRoute: typeof TermsRoute
   HistoryCourseRoute: typeof HistoryCourseRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -197,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LookupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports': {
       id: '/reports'
       path: '/reports'
@@ -218,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/history/': {
       id: '/history/'
       path: '/history'
@@ -236,14 +296,17 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   CaptureRoute: CaptureRoute,
   DashboardRoute: DashboardRoute,
   HelpRoute: HelpRoute,
   LookupRoute: LookupRoute,
+  PrivacyRoute: PrivacyRoute,
   ReportsRoute: ReportsRoute,
   ResultsRoute: ResultsRoute,
   SettingsRoute: SettingsRoute,
+  TermsRoute: TermsRoute,
   HistoryCourseRoute: HistoryCourseRoute,
   HistoryIndexRoute: HistoryIndexRoute,
 }
