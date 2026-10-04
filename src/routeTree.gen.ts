@@ -9,8 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CaptureRouteImport } from './routes/capture'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as LookupRouteImport } from './routes/lookup'
@@ -20,14 +20,14 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as HistoryIndexRouteImport } from './routes/history.index'
 import { Route as HistoryCourseRouteImport } from './routes/history.$course'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CaptureRoute = CaptureRouteImport.update({
+  id: '/capture',
+  path: '/capture',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -72,8 +72,8 @@ const HistoryCourseRoute = HistoryCourseRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
   '/lookup': typeof LookupRoute
@@ -84,8 +84,8 @@ export interface FileRoutesByFullPath {
   '/history/': typeof HistoryIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
   '/lookup': typeof LookupRoute
@@ -97,8 +97,8 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
   '/lookup': typeof LookupRoute
@@ -111,8 +111,8 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
     | '/auth'
+    | '/capture'
     | '/dashboard'
     | '/help'
     | '/lookup'
@@ -123,8 +123,8 @@ export interface FileRouteTypes {
     | '/history/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
     | '/auth'
+    | '/capture'
     | '/dashboard'
     | '/help'
     | '/lookup'
@@ -135,8 +135,8 @@ export interface FileRouteTypes {
     | '/history'
   id:
     | '__root__'
-    | '/'
     | '/auth'
+    | '/capture'
     | '/dashboard'
     | '/help'
     | '/lookup'
@@ -148,8 +148,8 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  CaptureRoute: typeof CaptureRoute
   DashboardRoute: typeof DashboardRoute
   HelpRoute: typeof HelpRoute
   LookupRoute: typeof LookupRoute
@@ -162,18 +162,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth': {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/capture': {
+      id: '/capture'
+      path: '/capture'
+      fullPath: '/capture'
+      preLoaderRoute: typeof CaptureRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -236,8 +236,8 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  CaptureRoute: CaptureRoute,
   DashboardRoute: DashboardRoute,
   HelpRoute: HelpRoute,
   LookupRoute: LookupRoute,

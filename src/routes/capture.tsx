@@ -25,7 +25,7 @@ import { DEFAULT_MATRIC_SAMPLE, patternToRegex, describePattern } from "@/lib/ma
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/capture")({
   validateSearch: (search: Record<string, unknown>): { course?: string } =>
     typeof search.course === "string" && search.course ? { course: search.course } : {},
   head: () => ({
