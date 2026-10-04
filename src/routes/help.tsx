@@ -9,6 +9,8 @@ export const Route = createFileRoute("/help")({
       { name: "description", content: "Guidance on capturing exam scripts, resolving flagged records and exporting verified result workbooks." },
       { property: "og:title", content: "Help & Support — ScriptScan Office of Examinations" },
       { property: "og:description", content: "Guidance on capture, review and export procedures." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Help,
@@ -39,7 +41,7 @@ function Help() {
       title="Help & Support"
       description="Standard operating procedure for examination script digitisation."
       actions={
-        <Link to="/" search={{}}>
+        <Link to="/capture" search={{}}>
           <Button className="h-10">Go to capture</Button>
         </Link>
       }

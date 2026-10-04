@@ -34,6 +34,8 @@ export const Route = createFileRoute("/capture")({
       { name: "description", content: "Capture marked exam scripts by photo, live camera, or voice and compile matric numbers and scores into Excel." },
       { property: "og:title", content: "Examination Console — ScriptScan" },
       { property: "og:description", content: "Capture marked exam scripts by photo, live camera, or voice and compile results into Excel." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Index,

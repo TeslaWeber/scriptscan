@@ -14,6 +14,8 @@ export const Route = createFileRoute("/dashboard")({
       { name: "description", content: "Overview of examination script capture, processed results, pending reviews and exported workbooks." },
       { property: "og:title", content: "Dashboard — ScriptScan Office of Examinations" },
       { property: "og:description", content: "Overview of examination capture and result processing." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Dashboard,
@@ -74,7 +76,7 @@ function Dashboard() {
       title="Dashboard"
       description="Overview of examination capture and result processing."
       actions={
-        <Link to="/" search={{}}>
+        <Link to="/capture" search={{}}>
           <Button className="h-10">Start capture</Button>
         </Link>
       }

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { LogOut } from "lucide-react";
 import { AppShell, Panel, StatusPill } from "@/components/app-shell";
@@ -16,6 +16,8 @@ export const Route = createFileRoute("/settings")({
       { name: "description", content: "Review your examination officer account, capture defaults and data handling for ScriptScan." },
       { property: "og:title", content: "Settings — ScriptScan Office of Examinations" },
       { property: "og:description", content: "Account details, capture defaults and data handling." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: SettingsPage,
@@ -74,6 +76,17 @@ function SettingsPage() {
             Capture defaults are tuned for accuracy on handwritten scripts and are applied automatically on the
             Capture screen.
           </p>
+        </Panel>
+
+        <Panel title="Legal">
+          <div className="grid divide-y divide-border">
+            <Link to="/privacy" className="flex items-center justify-between gap-4 py-3 text-sm font-medium text-foreground hover:text-primary">
+              Privacy Policy <span aria-hidden>→</span>
+            </Link>
+            <Link to="/terms" className="flex items-center justify-between gap-4 py-3 text-sm font-medium text-foreground hover:text-primary">
+              Terms of Service <span aria-hidden>→</span>
+            </Link>
+          </div>
         </Panel>
       </div>
     </AppShell>
