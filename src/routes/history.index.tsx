@@ -88,7 +88,7 @@ function History() {
       title="Examinations"
       description="All recorded capture sessions, grouped by course."
       actions={
-        <Link to="/" search={{}}>
+        <Link to="/capture" search={{}}>
           <Button className="h-10">New capture</Button>
         </Link>
       }

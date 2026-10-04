@@ -48,7 +48,7 @@ function AuthPage() {
       if (result.error) { toast.error(result.error.message ?? "Sign-in failed"); return; }
       if (result.redirected) return;
       if (ret && isAllowedReturn(ret)) { await handBack(ret); return; }
-      navigate({ to: "/" });
+      navigate({ to: "/dashboard" });
     } catch (e: any) {
       toast.error(e?.message ?? "Sign-in failed");
     } finally {
@@ -63,7 +63,7 @@ function AuthPage() {
     if (at && rt) {
       history.replaceState(null, "", window.location.pathname);
       supabase.auth.setSession({ access_token: at, refresh_token: rt }).then(({ error }) => {
-        if (error) toast.error(error.message); else navigate({ to: "/" });
+        if (error) toast.error(error.message); else navigate({ to: "/dashboard" });
       });
       return;
     }
@@ -81,7 +81,7 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/" });
+      if (data.session) navigate({ to: "/dashboard" });
     });
   }, [navigate]);
 
@@ -94,24 +94,24 @@ function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: `${window.location.origin}/dashboard`,
             data: { display_name: name || email.split("@")[0] },
           },
         });
         if (error) throw error;
         if (data.session) {
           toast.success("Account created");
-          navigate({ to: "/" });
+          navigate({ to: "/dashboard" });
         } else {
           const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
           if (signInError) throw signInError;
           toast.success("Account created");
-          navigate({ to: "/" });
+          navigate({ to: "/dashboard" });
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate({ to: "/" });
+        navigate({ to: "/dashboard" });
       }
 
     } catch (e: any) {

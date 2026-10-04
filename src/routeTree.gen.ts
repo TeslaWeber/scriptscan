@@ -11,12 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CaptureRouteImport } from './routes/capture'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as LookupRouteImport } from './routes/lookup'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ResultsRouteImport } from './routes/results'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as HistoryIndexRouteImport } from './routes/history.index'
 import { Route as HistoryCourseRouteImport } from './routes/history.$course'
 
@@ -28,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CaptureRoute = CaptureRouteImport.update({
+  id: '/capture',
+  path: '/capture',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -45,6 +53,11 @@ const LookupRoute = LookupRouteImport.update({
   path: '/lookup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -58,6 +71,11 @@ const ResultsRoute = ResultsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoryIndexRoute = HistoryIndexRouteImport.update({
@@ -74,24 +92,30 @@ const HistoryCourseRoute = HistoryCourseRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
   '/lookup': typeof LookupRoute
+  '/privacy': typeof PrivacyRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/history/$course': typeof HistoryCourseRoute
   '/history/': typeof HistoryIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
   '/lookup': typeof LookupRoute
+  '/privacy': typeof PrivacyRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/history/$course': typeof HistoryCourseRoute
   '/history': typeof HistoryIndexRoute
 }
@@ -99,12 +123,15 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/capture': typeof CaptureRoute
   '/dashboard': typeof DashboardRoute
   '/help': typeof HelpRoute
   '/lookup': typeof LookupRoute
+  '/privacy': typeof PrivacyRoute
   '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/history/$course': typeof HistoryCourseRoute
   '/history/': typeof HistoryIndexRoute
 }
@@ -113,36 +140,45 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/capture'
     | '/dashboard'
     | '/help'
     | '/lookup'
+    | '/privacy'
     | '/reports'
     | '/results'
     | '/settings'
+    | '/terms'
     | '/history/$course'
     | '/history/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/capture'
     | '/dashboard'
     | '/help'
     | '/lookup'
+    | '/privacy'
     | '/reports'
     | '/results'
     | '/settings'
+    | '/terms'
     | '/history/$course'
     | '/history'
   id:
     | '__root__'
     | '/'
     | '/auth'
+    | '/capture'
     | '/dashboard'
     | '/help'
     | '/lookup'
+    | '/privacy'
     | '/reports'
     | '/results'
     | '/settings'
+    | '/terms'
     | '/history/$course'
     | '/history/'
   fileRoutesById: FileRoutesById
@@ -150,12 +186,15 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  CaptureRoute: typeof CaptureRoute
   DashboardRoute: typeof DashboardRoute
   HelpRoute: typeof HelpRoute
   LookupRoute: typeof LookupRoute
+  PrivacyRoute: typeof PrivacyRoute
   ReportsRoute: typeof ReportsRoute
   ResultsRoute: typeof ResultsRoute
   SettingsRoute: typeof SettingsRoute
+  TermsRoute: typeof TermsRoute
   HistoryCourseRoute: typeof HistoryCourseRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
 }
@@ -174,6 +213,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/capture': {
+      id: '/capture'
+      path: '/capture'
+      fullPath: '/capture'
+      preLoaderRoute: typeof CaptureRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -197,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LookupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports': {
       id: '/reports'
       path: '/reports'
@@ -216,6 +269,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/history/': {
@@ -238,12 +298,15 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  CaptureRoute: CaptureRoute,
   DashboardRoute: DashboardRoute,
   HelpRoute: HelpRoute,
   LookupRoute: LookupRoute,
+  PrivacyRoute: PrivacyRoute,
   ReportsRoute: ReportsRoute,
   ResultsRoute: ResultsRoute,
   SettingsRoute: SettingsRoute,
+  TermsRoute: TermsRoute,
   HistoryCourseRoute: HistoryCourseRoute,
   HistoryIndexRoute: HistoryIndexRoute,
 }

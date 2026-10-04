@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 const NAV = [
   { label: "Dashboard", to: "/dashboard", icon: LayoutGrid },
   { label: "Examinations", to: "/history", icon: FolderOpen },
-  { label: "Capture", to: "/", icon: ScanLine },
+  { label: "Capture", to: "/capture", icon: ScanLine },
   { label: "Results", to: "/results", icon: Table2 },
   { label: "Lookup", to: "/lookup", icon: Search },
   { label: "Reports", to: "/reports", icon: FileBarChart2 },
@@ -23,7 +23,6 @@ const NAV = [
 ] as const;
 
 function isActive(pathname: string, to: string) {
-  if (to === "/") return pathname === "/";
   return pathname === to || pathname.startsWith(to + "/");
 }
 
@@ -36,7 +35,7 @@ function NavList({ pathname, onNavigate }: { pathname: string; onNavigate?: () =
           <Link
             key={to}
             to={to}
-            search={to === "/" ? {} : undefined}
+            search={to === "/capture" ? {} : undefined}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
