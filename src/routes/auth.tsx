@@ -33,8 +33,19 @@ function AuthPage() {
   const social = async (provider: "google" | "apple" | "microsoft") => {
     setBusy(true);
     try {
-      // Off Lovable hosting (e.g. Vercel): sign in via the Lovable-hosted bridge, which hands the session back.
+      // Off Lovable hosting (e.g. Vercel): Google uses the project's own OAuth
+      // credentials, so it can sign in directly via the backend. Apple and
+      // Microsoft still use the Lovable-hosted bridge until their own
+      // credentials are configured.
       if (!isLovableHost()) {
+        if (provider === "google") {
+          const { error } = await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: { redirectTo: `${window.location.origin}/auth` },
+          });
+          if (error) toast.error(error.message);
+          return;
+        }
         const back = `${window.location.origin}/auth`;
         window.location.href = `${BRIDGE_ORIGIN}/auth?bridge=${provider}&return=${encodeURIComponent(back)}`;
         return;
