@@ -203,15 +203,17 @@ export function AppShell({
         </header>
 
         <main className="mx-auto min-w-0 max-w-[1400px] px-3 py-5 sm:px-6 sm:py-8">
-          <div className="mb-6 grid gap-3 sm:mb-8 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-            <div className="min-w-0">
-              <h1 className="page-title text-foreground">{title}</h1>
-              {description && (
-                <p className="mt-1 max-w-2xl text-[15px] text-muted-foreground">{description}</p>
-              )}
+          {(title || description || actions) && (
+            <div className="mb-6 grid gap-3 sm:mb-8 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+              <div className="min-w-0">
+                {title && <h1 className="page-title text-foreground">{title}</h1>}
+                {description && (
+                  <p className="mt-1 max-w-2xl text-[15px] text-muted-foreground">{description}</p>
+                )}
+              </div>
+              {actions && <div className="flex min-w-0 flex-wrap items-center gap-2 [&>*]:max-w-full">{actions}</div>}
             </div>
-            {actions && <div className="flex min-w-0 flex-wrap items-center gap-2 [&>*]:max-w-full">{actions}</div>}
-          </div>
+          )}
           <div className="min-w-0">{children}</div>
         </main>
       </div>
