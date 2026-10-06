@@ -73,13 +73,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [exams, setExams] = useState<ExamRow[]>([]);
   const [exports, setExports] = useState(0);
-  const [today, setToday] = useState("");
 
-  useEffect(() => {
-    setToday(
-      new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase(),
-    );
-  }, []);
 
   useEffect(() => {
     if (!ready) return;
@@ -122,18 +116,8 @@ function Dashboard() {
             <h1 className="mt-1 font-registry text-[28px] font-semibold italic leading-tight sm:text-[34px]">
               Examination Register
             </h1>
-            <p className="mt-1.5 max-w-xl text-[13px] text-white/65">
-              Live overview of examination capture and result processing for the Office of Examinations.
-            </p>
           </div>
-          <div className="flex shrink-0 flex-col items-start gap-3 sm:items-end">
-            <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/70 sm:text-right">
-              <p className="text-[color:var(--color-gold)]/90">Record date: {today || "—"}</p>
-              <p className="mt-0.5 flex items-center gap-1.5 sm:justify-end">
-                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[color:var(--color-gold)]" aria-hidden />
-                Status: Active
-              </p>
-            </div>
+          <div className="flex shrink-0 sm:items-end">
             <Link to="/capture" search={{}}>
               <Button className="h-9 bg-[color:var(--color-gold)] text-[color:var(--color-navy-dark)] hover:bg-[color:var(--color-gold)]/85">
                 Start capture
@@ -141,6 +125,7 @@ function Dashboard() {
             </Link>
           </div>
         </div>
+
       </section>
 
       {/* Ledger metrics */}
