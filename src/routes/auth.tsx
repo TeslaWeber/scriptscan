@@ -283,14 +283,8 @@ function AuthPage() {
             </Button>
           </form>
 
-          <div className="my-5 flex items-center gap-3 text-[12px] text-muted-foreground">
-            <span className="h-px flex-1 bg-border" /> or continue with <span className="h-px flex-1 bg-border" />
-          </div>
-          <div className="grid gap-2">
-            <Button type="button" variant="outline" className="h-10 w-full" disabled={busy} onClick={() => social("google")}>Continue with Google</Button>
-            <Button type="button" variant="outline" className="h-10 w-full" disabled={busy} onClick={() => social("apple")}>Continue with Apple</Button>
-            <Button type="button" variant="outline" className="h-10 w-full" disabled={busy} onClick={() => social("microsoft")}>Continue with Microsoft</Button>
-          </div>
+          {/* Social sign-in temporarily hidden — restore this block to reveal again. */}
+
 
           <button
             type="button"
