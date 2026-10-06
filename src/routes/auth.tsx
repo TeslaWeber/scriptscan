@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ function AuthPage() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const handledSession = useRef(false);
 
   const social = async (provider: "google" | "apple" | "microsoft") => {
     setBusy(true);
@@ -67,33 +68,63 @@ function AuthPage() {
     }
   };
 
-  // Bridge: receive session from Lovable host, or start/finish the bridge on the Lovable host.
+  // Complete OAuth only after Supabase has restored the session from the provider redirect.
   useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams(window.location.search);
+    const ret = params.get("return");
+
+    const finishSignIn = async () => {
+      if (!active || handledSession.current) return;
+      handledSession.current = true;
+      if (isLovableHost() && ret && isAllowedReturn(ret)) {
+        await handBack(ret);
+      } else {
+        await navigate({ to: "/dashboard", replace: true });
+      }
+    };
+
     const hash = new URLSearchParams(window.location.hash.slice(1));
     const at = hash.get("bridge_at"), rt = hash.get("bridge_rt");
     if (at && rt) {
       history.replaceState(null, "", window.location.pathname);
       supabase.auth.setSession({ access_token: at, refresh_token: rt }).then(({ error }) => {
-        if (error) toast.error(error.message); else navigate({ to: "/dashboard" });
+        if (error) toast.error(error.message); else void finishSignIn();
       });
-      return;
     }
-    if (!isLovableHost()) return;
-    const params = new URLSearchParams(window.location.search);
-    const ret = params.get("return");
-    if (!ret || !isAllowedReturn(ret)) return;
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) { handBack(ret); return; }
-      const p = params.get("bridge");
-      if (p === "google" || p === "apple" || p === "microsoft") social(p);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/dashboard" });
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
+        void finishSignIn();
+      }
     });
+
+    // Supabase can finish restoring an implicit-flow session before the listener
+    // is attached, so also inspect the initialized session as a fallback.
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (!active) return;
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      if (data.session) void finishSignIn();
+    });
+
+    if (isLovableHost() && ret && isAllowedReturn(ret)) {
+      void supabase.auth.getSession().then(({ data }) => {
+        if (data.session) return;
+        const provider = params.get("bridge");
+        if (provider === "google" || provider === "apple" || provider === "microsoft") {
+          void social(provider);
+        }
+      });
+    }
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   const submit = async (e: React.FormEvent) => {
