@@ -77,11 +77,47 @@ function AuthPage() {
     const finishSignIn = async () => {
       if (!active || handledSession.current) return;
       handledSession.current = true;
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete("code");
+      currentUrl.searchParams.delete("state");
+      window.history.replaceState(null, "", `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
       if (isLovableHost() && ret && isAllowedReturn(ret)) {
         await handBack(ret);
       } else {
         await navigate({ to: "/dashboard", replace: true });
       }
+    };
+
+    const completeOAuthReturn = async () => {
+      const oauthError = params.get("error_description") ?? params.get("error");
+      if (oauthError) {
+        toast.error(oauthError);
+        return;
+      }
+
+      const code = params.get("code");
+      if (!code) return;
+
+      // The Supabase client normally consumes PKCE callback codes during
+      // initialization. Explicitly exchange as a fallback for deployments
+      // where the route mounts before that callback has been finalized.
+      const { data: current, error: sessionError } = await supabase.auth.getSession();
+      if (!active) return;
+      if (current.session) {
+        await finishSignIn();
+        return;
+      }
+      if (sessionError) toast.error(sessionError.message);
+
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!active) return;
+      if (error) {
+        const { data: recovered } = await supabase.auth.getSession();
+        if (recovered.session) await finishSignIn();
+        else toast.error(error.message);
+        return;
+      }
+      if (data.session) await finishSignIn();
     };
 
     const hash = new URLSearchParams(window.location.hash.slice(1));
@@ -95,7 +131,7 @@ function AuthPage() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
-        void finishSignIn();
+        window.setTimeout(() => void finishSignIn(), 0);
       }
     });
 
@@ -109,6 +145,7 @@ function AuthPage() {
       }
       if (data.session) void finishSignIn();
     });
+    void completeOAuthReturn();
 
     if (isLovableHost() && ret && isAllowedReturn(ret)) {
       void supabase.auth.getSession().then(({ data }) => {
