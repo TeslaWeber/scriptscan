@@ -73,13 +73,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [exams, setExams] = useState<ExamRow[]>([]);
   const [exports, setExports] = useState(0);
-  const [today, setToday] = useState("");
 
-  useEffect(() => {
-    setToday(
-      new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase(),
-    );
-  }, []);
 
   useEffect(() => {
     if (!ready) return;
